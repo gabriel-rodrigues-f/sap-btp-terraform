@@ -24,3 +24,15 @@ module "entitlements" {
 
   app_dev_rpa_subaccount = module.subaccounts.app_dev_rpa_subaccount
 }
+
+module "environments" {
+  source                 = "./3-environments"
+  depends_on             = [module.entitlements]
+  app_dev_rpa_subaccount = module.subaccounts.app_dev_rpa_subaccount
+  subaccount_admin       = var.subaccount_admin
+
+  providers = {
+    btp          = btp
+    cloudfoundry = cloudfoundry
+  }
+}
