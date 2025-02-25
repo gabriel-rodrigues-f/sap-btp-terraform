@@ -46,3 +46,9 @@ module "subscriptions" {
     btp = btp
   }
 }
+
+module "services" {
+  source                = "./5-services"
+  depends_on            = [module.subscriptions]
+  app_dev_rpa_dev_space = module.environments.app_dev_rpa_dev_space
+}
