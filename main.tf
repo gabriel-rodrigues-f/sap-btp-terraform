@@ -17,3 +17,10 @@ module "subaccounts" {
     btp = btp
   }
 }
+
+module "entitlements" {
+  source     = "./2-entitlements"
+  depends_on = [module.subaccounts]
+
+  app_dev_rpa_subaccount = module.subaccounts.app_dev_rpa_subaccount
+}
