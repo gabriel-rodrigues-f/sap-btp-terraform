@@ -36,3 +36,13 @@ module "environments" {
     cloudfoundry = cloudfoundry
   }
 }
+
+module "subscriptions" {
+  source                 = "./4-subscriptions"
+  depends_on             = [module.environments]
+  app_dev_rpa_subaccount = module.subaccounts.app_dev_rpa_subaccount
+
+  providers = {
+    btp = btp
+  }
+}
