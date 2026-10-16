@@ -64,9 +64,11 @@ resource "cloudfoundry_service_instance" "this" {
     "plan"          = each.value.plan
   })
 
+  # PostgreSQL e Redis da trial podem levar mais de 15 min; um timeout deixaria
+  # a instância "tainted" (recriada no próximo apply). 40 min = padrão do provider.
   timeouts = {
-    create = "15m"
-    delete = "15m"
+    create = "40m"
+    delete = "40m"
   }
 
   depends_on = [cloudfoundry_space_role.this]
