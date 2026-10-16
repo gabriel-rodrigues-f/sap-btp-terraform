@@ -1,3 +1,8 @@
+output "deployer" {
+  description = "Usuário autenticado neste apply (precisa ser o mesmo do stack 10)."
+  value       = data.btp_whoami.deployer.email
+}
+
 output "ias_host" {
   description = "Tenant do SAP Cloud Identity Services."
   value       = module.identity.ias_host

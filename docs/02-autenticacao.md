@@ -12,6 +12,27 @@ de comando.
 | Provider Cloud Foundry (stack 20) | `CF_USER`, `CF_PASSWORD` | O Makefile copia de `BTP_*` |
 | cf CLI no Ansible (`cf auth`) | `CF_USERNAME`, `CF_PASSWORD` | `group_vars` lê de `BTP_*` |
 
+## Regra de identidade: confira ANTES de autenticar
+
+Se o seu computador tem credenciais de mais de uma conta SAP (ex.: uma conta
+corporativa exportada no `~/.zshrc`), **toda aba nova de terminal herda essas
+credenciais**. Antes de qualquer `plan`, `apply`, `configure` ou login:
+
+```bash
+echo "$BTP_USERNAME"      # tem que ser o usuário da conta-alvo
+btp --info | grep User    # sessão do btp CLI
+cf target | grep user     # sessão do cf CLI
+```
+
+O repositório reforça a regra com travas:
+
+| Trava | O que barra |
+| --- | --- |
+| `make check-creds` (todo alvo de plan/apply/configure) | `BTP_USERNAME` diferente do primeiro `access.platform_admins` do tfvars |
+| Pós-condição em `data "btp_whoami"` (stacks 10 e 15) | Terraform autenticado com usuário fora de `platform_admins` ou diferente de quem aplicou o stack 10 |
+| Role `cf_target` (Ansible) | `cf auth` com usuário diferente do deployer |
+| Makefile | `CF_USER`/`CF_PASSWORD` herdados do perfil: o stack 20 usa sempre `BTP_*` |
+
 ## Exportar as credenciais
 
 ```bash

@@ -23,6 +23,7 @@
     btp_context_out: "{{ btp_context_outputs.outputs }}"
   ansible.builtin.set_fact:
     btp_context_info:
+      deployer: "{{ btp_context_out.deployer.value }}"
       cf_api_url: "{{ btp_context_out.cf_api_url.value }}"
       cf_org_id: "{{ btp_context_out.cf_org_id.value }}"
       cf_org_name: "{{ btp_context_out.cf_org_name.value }}"

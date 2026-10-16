@@ -1,2 +1,4 @@
 ---
 cf_target_space: ""
+# Usuário esperado (deployer do Terraform). Vazio = sem checagem.
+cf_target_expected_user: ""

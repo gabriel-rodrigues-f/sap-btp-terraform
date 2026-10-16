@@ -5,6 +5,11 @@ output "cf_api_url" {
   value       = local.account.cf_api_url
 }
 
+output "deployer" {
+  description = "Usuário que aplicou o stack 10 (o Ansible só autentica no CF com ele)."
+  value       = local.account.access.deployer
+}
+
 output "cf_org_id" {
   description = "GUID da org."
   value       = local.account.cf_org_id

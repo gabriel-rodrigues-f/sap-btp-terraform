@@ -10,6 +10,16 @@
       (veja docs/02-autenticacao.md).
   when: cf_target_username | length == 0 or cf_target_password | length == 0
 
+- name: Refuse credentials of a different user than the Terraform deployer
+  ansible.builtin.fail:
+    msg: >-
+      BTP_USERNAME é {{ cf_target_username }}, mas o ambiente foi criado por
+      {{ cf_target_expected_user }}. Confira as variáveis deste terminal
+      (ex.: credenciais de outra conta exportadas no ~/.zshrc).
+  when:
+    - cf_target_expected_user | length > 0
+    - cf_target_username != cf_target_expected_user
+
 - name: Point the cf CLI to the API endpoint created by Terraform
   ansible.builtin.command:
     argv: [cf, api, "{{ cf_target_api_url }}"]

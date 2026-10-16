@@ -16,6 +16,10 @@ argument_specs:
         type: str
         default: ""
         description: Nome do space (opcional; vazio = só a org).
+      cf_target_expected_user:
+        type: str
+        default: ""
+        description: Usuário esperado; a role falha se as credenciais forem de outro.
       cf_target_username:
         type: str
         required: true

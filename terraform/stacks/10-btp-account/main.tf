@@ -13,7 +13,17 @@
 # finops-labels) e permissões por persona (locals abaixo).
 #
 
-data "btp_whoami" "deployer" {}
+# Quem está executando o Terraform. A pós-condição é uma trava de segurança:
+# com várias contas SAP no mesmo computador, é fácil o shell herdar as
+# credenciais de OUTRA conta (ex.: BTP_USERNAME exportado no ~/.zshrc).
+data "btp_whoami" "deployer" {
+  lifecycle {
+    postcondition {
+      condition     = contains(var.access.platform_admins, self.email)
+      error_message = "O Terraform está autenticado como ${self.email}, que não está em access.platform_admins. Confira BTP_USERNAME/BTP_PASSWORD neste terminal."
+    }
+  }
+}
 
 locals {
   # "203d9eebtrial-ga" -> "203d9eeb": estável, curto e único por global account.

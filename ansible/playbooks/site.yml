@@ -20,6 +20,7 @@
       vars:
         cf_target_api_url: "{{ btp_context_info.cf_api_url }}"
         cf_target_org: "{{ btp_context_info.cf_org_name }}"
+        cf_target_expected_user: "{{ btp_context_info.deployer }}"
 
     - role: cf_org_metadata
       vars:

@@ -13,6 +13,17 @@ locals {
   app_users = coalesce(var.app_users, [local.account.access.deployer])
 }
 
+# Trava de segurança: este stack deve rodar com a MESMA identidade que criou
+# o subaccount no stack 10 (evita credenciais de outra conta herdadas do shell).
+data "btp_whoami" "deployer" {
+  lifecycle {
+    postcondition {
+      condition     = self.email == local.account.access.deployer
+      error_message = "O Terraform está autenticado como ${self.email}, mas o stack 10 foi aplicado por ${local.account.access.deployer}. Confira BTP_USERNAME/BTP_PASSWORD neste terminal."
+    }
+  }
+}
+
 module "naming" {
   source = "../../modules/naming"
 

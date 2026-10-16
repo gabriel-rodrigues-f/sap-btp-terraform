@@ -23,14 +23,17 @@ CF_STACK       := terraform/stacks/20-cloudfoundry
 MODULES        := $(wildcard terraform/modules/*)
 ANSIBLE        := cd ansible && PATH="$(BIN):$$PATH" ansible-playbook
 
-# Lê o subdomínio do global account do tfvars (evita digitar duas vezes).
+# Lê o subdomínio do global account e o primeiro platform_admin do tfvars.
 GLOBALACCOUNT  ?= $(shell sed -nE 's/^globalaccount *= *"([^"]+)".*/\1/p' $(ACCOUNT_STACK)/terraform.tfvars 2>/dev/null)
+# Única identidade aceita para rodar Terraform/Ansible neste ambiente.
+EXPECTED_USER  ?= $(shell sed -nE 's/^ *platform_admins *= *\[ *"([^"]+)".*/\1/p' $(ACCOUNT_STACK)/terraform.tfvars 2>/dev/null)
 
 # Um único par de credenciais (BTP_USERNAME / BTP_PASSWORD) serve para tudo.
-# O provider CF lê CF_USER/CF_PASSWORD e o cf CLI lê CF_USERNAME/CF_PASSWORD;
-# o mapeamento é feito pelo SHELL (não pelo make), para que senhas com "$" não
-# sejam reinterpretadas.
-CF_ENV := CF_USER="$${CF_USER:-$$BTP_USERNAME}" CF_USERNAME="$${CF_USERNAME:-$$BTP_USERNAME}" CF_PASSWORD="$${CF_PASSWORD:-$$BTP_PASSWORD}"
+# O provider CF lê CF_USER/CF_PASSWORD e o cf CLI lê CF_USERNAME/CF_PASSWORD.
+# SEMPRE derivados de BTP_*: um CF_USER herdado do perfil do shell (de outra
+# conta) nunca deve vencer. O mapeamento é feito pelo SHELL (não pelo make),
+# para que senhas com "$" não sejam reinterpretadas.
+CF_ENV := CF_USER="$$BTP_USERNAME" CF_USERNAME="$$BTP_USERNAME" CF_PASSWORD="$$BTP_PASSWORD"
 # Não consultar a HashiCorp a cada comando (checagem de versão nova).
 export CHECKPOINT_DISABLE := 1
 
@@ -60,6 +63,14 @@ check-creds: ## Confere se BTP_USERNAME e BTP_PASSWORD estão exportadas
 	  echo '  export BTP_USERNAME="voce@exemplo.com"'; \
 	  echo '  read -rs BTP_PASSWORD && export BTP_PASSWORD'; \
 	  exit 1; }
+	@[ -n "$(EXPECTED_USER)" ] || { echo "Defina access.platform_admins em $(ACCOUNT_STACK)/terraform.tfvars"; exit 1; }
+	@[ "$${BTP_USERNAME}" = "$(EXPECTED_USER)" ] || { \
+	  echo "BLOQUEADO: BTP_USERNAME=$${BTP_USERNAME}, mas este ambiente só aceita $(EXPECTED_USER)."; \
+	  echo "Provavelmente herdado do perfil do shell (ex.: ~/.zshrc). Neste terminal, rode:"; \
+	  echo '  export BTP_USERNAME="$(EXPECTED_USER)"'; \
+	  echo '  read -rs BTP_PASSWORD && export BTP_PASSWORD'; \
+	  exit 1; }
+	@echo "Autenticando como: $${BTP_USERNAME}"
 
 .PHONY: login-btp
 login-btp: ## Login do btp CLI (pede usuário e senha) para os comandos manuais/discover
