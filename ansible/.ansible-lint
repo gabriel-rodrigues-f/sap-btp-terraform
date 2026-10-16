@@ -1,0 +1,10 @@
+---
+# Perfil mais rigoroso do ansible-lint: FQCN, nomes de tasks, changed_when,
+# prefixo de variáveis por role, permissões de arquivos etc.
+profile: production
+
+exclude_paths:
+  - collections/
+  - ../.venv/
+
+offline: false

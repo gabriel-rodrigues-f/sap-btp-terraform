@@ -1,0 +1,25 @@
+---
+# Falhar CEDO e com mensagem clara é mais barato do que falhar no meio do deploy.
+
+- name: Check that required CLIs are installed
+  ansible.builtin.command:
+    argv: ["{{ item }}", "--version"]
+  loop: "{{ preflight_required_binaries }}"
+  changed_when: false
+  check_mode: false
+
+- name: Check that the cf CLI has a valid session
+  ansible.builtin.command:
+    argv: [cf, oauth-token]
+  register: preflight_cf_session
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  no_log: true # a saída é um bearer token: nunca deixe aparecer em log
+
+- name: Fail with guidance when the cf session is missing or expired
+  ansible.builtin.fail:
+    msg: >-
+      Sessão do cf CLI ausente ou expirada.
+      Rode `make login-cf` (abre o navegador para login com SAP Universal ID).
+  when: preflight_cf_session.rc != 0

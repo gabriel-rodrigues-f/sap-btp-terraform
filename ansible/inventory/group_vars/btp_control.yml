@@ -1,0 +1,11 @@
+---
+# Parâmetros do AMBIENTE (o que muda entre dev/qas/prd).
+# Defaults técnicos ficam em roles/<role>/defaults/main.yml.
+# O "onde" (org, space, serviços) NÃO fica aqui: vem dos outputs do Terraform.
+
+app_name: hello-btp
+app_memory: 128M
+app_instances: 1
+
+# Destination criada pelo Terraform (stack 10) que a app vai ler.
+app_destination_name: northwind

@@ -1,0 +1,22 @@
+---
+# {{ ansible_managed }}
+# Gerado pela role cf_app. Não edite: altere as variáveis cf_app_*.
+applications:
+  - name: {{ cf_app_name }}
+    path: {{ cf_app_source_dir }}
+    buildpacks:
+      - {{ cf_app_buildpack }}
+    memory: {{ cf_app_memory }}
+    disk_quota: {{ cf_app_disk_quota }}
+    instances: {{ cf_app_instances }}
+    health-check-type: http
+    health-check-http-endpoint: {{ cf_app_health_check_endpoint }}
+    routes:
+      - route: {{ cf_app_route }}
+    services: {{ cf_app_services | to_json }}
+    env: {{ cf_app_env | to_json }}
+    metadata:
+      labels:
+        managed-by: ansible
+      annotations:
+        deploy-digest: "{{ cf_app_digest }}"

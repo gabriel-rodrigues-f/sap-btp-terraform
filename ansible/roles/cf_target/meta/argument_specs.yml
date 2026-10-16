@@ -1,0 +1,18 @@
+---
+# argument_specs: o Ansible valida as entradas da role ANTES de executá-la.
+argument_specs:
+  main:
+    short_description: Aponta o cf CLI para a org/space corretos.
+    options:
+      cf_target_api_url:
+        type: str
+        required: true
+        description: Endpoint esperado da API Cloud Foundry.
+      cf_target_org:
+        type: str
+        required: true
+        description: Nome da org.
+      cf_target_space:
+        type: str
+        required: true
+        description: Nome do space.

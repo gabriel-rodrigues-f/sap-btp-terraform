@@ -1,0 +1,26 @@
+---
+# Garante que o cf CLI está apontando para o lugar certo ANTES de qualquer
+# alteração. Um `cf push` na org errada é um dos erros mais comuns (e caros).
+
+- name: Read the API endpoint the cf CLI is pointing to
+  ansible.builtin.command:
+    argv: [cf, api]
+  register: cf_target_current_api
+  changed_when: false
+  check_mode: false
+
+- name: Ensure the cf CLI points to the expected API endpoint
+  ansible.builtin.assert:
+    that:
+      - cf_target_api_url in cf_target_current_api.stdout
+    fail_msg: >-
+      O cf CLI aponta para outro endpoint. Esperado: {{ cf_target_api_url }}.
+      Rode `make login-cf`.
+    quiet: true
+
+- name: Target the org and space created by Terraform
+  ansible.builtin.command:
+    argv: [cf, target, -o, "{{ cf_target_org }}", -s, "{{ cf_target_space }}"]
+  # Só muda o contexto LOCAL do CLI (~/.cf/config.json), nada no BTP.
+  changed_when: false
+  check_mode: false

@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: btp_context
+  author: gabriel-rodrigues-f
+  description: Lê os outputs do Terraform e publica o contexto BTP (org, space, serviços) como fato.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericUNIX
+      versions: [all]
+dependencies: []

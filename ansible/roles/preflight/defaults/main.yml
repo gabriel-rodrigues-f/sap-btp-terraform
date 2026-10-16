@@ -1,0 +1,5 @@
+---
+# CLIs que precisam estar no PATH da máquina de controle.
+preflight_required_binaries:
+  - terraform
+  - cf
