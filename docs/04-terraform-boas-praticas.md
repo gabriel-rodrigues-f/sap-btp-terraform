@@ -5,12 +5,16 @@ Cada seção aponta onde a prática aparece no código.
 ## Camadas com estados separados (stacks)
 
 ```text
-stacks/10-btp-account  ->  outputs  ->  stacks/20-cloudfoundry  ->  outputs  ->  Ansible
+stacks/10-btp-account  ->  outputs  ->  stacks/15-btp-services
+                       ->  outputs  ->  stacks/20-cloudfoundry  ->  outputs  ->  Ansible
 ```
 
-- **Por quê dois stacks?** O provider `cloudfoundry` precisa do endpoint de uma
+- **Por que separar o stack 20?** O provider `cloudfoundry` precisa do endpoint de uma
   org que só existe depois do apply do stack 10. Colocar os dois providers no
   mesmo root module faz o primeiro `plan` falhar ou depender de gambiarras.
+- **Por que separar o stack 15?** Desligar o `sap.default` exige um bloco
+  `import` com o ID do subaccount, e esse ID precisa ser conhecido no `plan`.
+  Num stack próprio, ele vem pronto do stack 10, inclusive na primeira execução.
 - **Raio de impacto menor**: um erro no space não arrisca o subaccount.
 - **Permissões separadas**: quem opera spaces não precisa poder destruir subaccounts.
 - **Plans mais rápidos**: cada stack consulta só a sua API.

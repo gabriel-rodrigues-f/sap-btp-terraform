@@ -4,6 +4,7 @@
 output "conventions" {
   description = "Entradas da convenção de nomes (o stack 20 recalcula os nomes com elas)."
   value = {
+    globalaccount = var.globalaccount
     business_unit = var.business_unit
     workload      = var.workload
     environment   = var.environment
@@ -24,6 +25,7 @@ output "names" {
 output "labels" {
   description = "Labels de FinOps no formato do Cloud Foundry, annotations e chaves obrigatórias."
   value = {
+    btp           = module.labels.btp
     cf            = module.labels.cf
     cf_annotation = module.labels.cf_annotations
     required_keys = module.labels.required_keys
@@ -49,21 +51,6 @@ output "directory_id" {
 output "subaccount_id" {
   description = "ID do subaccount."
   value       = module.subaccount.id
-}
-
-output "subscriptions" {
-  description = "URL de acesso de cada assinatura SaaS."
-  value       = module.services.subscriptions
-}
-
-output "service_instances" {
-  description = "Instâncias no nível do subaccount (Service Manager)."
-  value       = module.services.service_instances
-}
-
-output "service_keys" {
-  description = "Service keys no nível do subaccount (sem credenciais)."
-  value       = module.services.service_keys
 }
 
 output "cf_api_url" {

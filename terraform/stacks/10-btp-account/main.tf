@@ -3,8 +3,11 @@
 #
 #   directory (unidade de negócio)
 #     └── subaccount <workload>-<ambiente>-<região>
-#           ├── entitlements, assinaturas, instâncias e service keys
+#           ├── catálogo de entitlements (cota para tudo o que os outros stacks usam)
+#           ├── papéis de PLATAFORMA (SAP ID service: cockpit, btp CLI, Terraform)
 #           └── ambiente Cloud Foundry (org)
+#
+# Identidade das aplicações (IAS), assinaturas e instâncias: stack 15.
 #
 # Tudo nasce com nome padronizado (módulo naming), labels de FinOps (módulo
 # finops-labels) e permissões por persona (locals abaixo).
@@ -40,10 +43,6 @@ module "naming" {
   environment   = var.environment
   region        = var.region
   unique_suffix = local.unique_suffix
-
-  service_instances = {
-    for key, si in var.service_instances : key => { offering = si.offering, instance = si.instance }
-  }
 }
 
 module "labels" {
@@ -87,18 +86,6 @@ module "subaccount" {
 
   entitlements                = var.entitlements
   role_collection_assignments = local.subaccount_roles
-}
-
-module "services" {
-  source = "../../modules/btp-services"
-
-  subaccount_id = module.subaccount.id # só existe depois dos entitlements
-  labels        = module.labels.btp
-  subscriptions = var.subscriptions
-
-  service_instances = {
-    for key, si in var.service_instances : key => merge(si, { name = module.naming.service_instances[key] })
-  }
 }
 
 module "cloudfoundry" {

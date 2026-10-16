@@ -4,10 +4,16 @@ Exemplo didático, pronto para rodar numa conta **trial** do SAP BTP, de como
 montar uma *landing zone* com governança desde o primeiro recurso:
 
 - **Convenção de nomes** no estilo Azure CAF: `application-integration-qa-us10`
-- **Labels de FinOps** em directory, subaccount, instâncias, service keys, org e spaces
-- **Permissões por persona** no directory, no subaccount, na org e no space do Cloud Foundry
-- **Serviços nos dois modelos**: instâncias no Cloud Foundry e no nível do
-  subaccount (Service Manager), assinaturas SaaS e uma service key por consumidor
+- **Labels de FinOps** em directory, subaccount, spaces, instâncias e service keys,
+  incluindo `value-stream` para ver o custo por processo de negócio
+- **Identidade de ponta a ponta**: tenant do SAP Cloud Identity Services (IAS)
+  com e-mail de ativação, trust no subaccount, IAS como IdP padrão e SAP ID
+  service fora do login das aplicações
+- **Permissões por persona** no directory, no subaccount, na org e em cada space,
+  e a role de admin de cada aplicação no usuário do IAS assim que ela é assinada
+- **Todas as aplicações e serviços que a trial permite**: Integration Suite, BAS,
+  Work Zone, Build Code, Build Apps, Process Automation, HANA Cloud Tools e
+  outras; ~40 instâncias com service keys por consumidor
 
 O **Terraform** cria tudo isso. O **Ansible** cobre o que o Terraform não alcança
 (labels na org, que é criada pelo BTP) e audita o ambiente real contra a
@@ -17,32 +23,34 @@ política de labels.
 
 ```mermaid
 flowchart TB
-  GA["Global account (trial)"]
-  subgraph DIR["Directory corporate-it  ·  labels: cost-center, business-unit, owner…"]
-    subgraph SA["Subaccount application-integration-qa-us10"]
-      SUB["Assinaturas SaaS<br/>feature-flags-dashboard · auditlog-viewer · automationpilot"]
-      SM["Instâncias no subaccount + keys<br/>audit-…-001 (sk-siem) · sm-…-001 (sk-finops-reporting)"]
+  IAS["SAP Cloud Identity Services (IAS)<br/>tenant + e-mail de ativação"]
+  subgraph DIR["Directory corporate-it  ·  cota + Directory Admin/Viewer"]
+    subgraph SA["Subaccount application-integration-qa-us10  ·  IdP padrão = IAS"]
+      APPS["12 aplicações SaaS<br/>Integration Suite · BAS · Work Zone · Build Code · Build Apps · Process Automation · HANA Cloud Tools · CI/CD · Cloud TMS · Automation Pilot · …<br/>role de admin no usuário do IAS"]
+      SM["6 instâncias de plataforma (Service Manager) + keys<br/>audit · sm · cis · xsuaa apiaccess"]
       subgraph ORG["Org CF application-integration-qa-us10-203d9eeb"]
-        subgraph SP["Space integration"]
-          CFI["7 instâncias: dest · uaa · conn · ff · ans · html5 · log<br/>6 service keys: sk-cicd · sk-integration-suite · sk-monitoring"]
-        end
+        VS["Spaces por value stream: o2c · p2p · r2r · h2r · d2o<br/>kit: destination · xsuaa · html5 host · logs (+ keys)"]
+        SH["Space shared-services<br/>16 serviços: conn · ff · ans · job · cred · ias · spa · redis · postgresql · IA …"]
       end
     end
   end
-  GA --> DIR
-  TF10["Terraform stack 10<br/>(provider SAP/btp)"] -.-> DIR
-  TF20["Terraform stack 20<br/>(provider cloudfoundry)"] -.-> SP
+  IAS -- "trust OIDC" --> SA
+  TF10["stack 10<br/>conta + cota"] -.-> DIR
+  TF15["stack 15<br/>IAS + apps + plataforma"] -.-> APPS
+  TF20["stack 20<br/>spaces + serviços"] -.-> ORG
   ANS["Ansible<br/>labels na org + auditoria FinOps"] -.-> ORG
 ```
 
 | Camada | Ferramenta | Cria/gerencia |
 | --- | --- | --- |
-| Stack `10-btp-account` | Terraform `SAP/btp` | Directory (cota + permissões), subaccount, entitlements, role collections, assinaturas, instâncias e keys no subaccount, ambiente CF (org) |
-| Stack `20-cloudfoundry` | Terraform `cloudfoundry/cloudfoundry` | Papéis na org, spaces, papéis nos spaces, instâncias e service keys no CF |
+| Stack `10-btp-account` | Terraform `SAP/btp` | Directory (cota + permissões), subaccount, catálogo de entitlements, papéis de plataforma, ambiente CF (org) |
+| Stack `15-btp-services` | Terraform `SAP/btp` | IAS (onboarding + trust), IAS como IdP padrão, `sap.default` fora do login, assinaturas + roles de admin no usuário do IAS, instâncias de plataforma |
+| Stack `20-cloudfoundry` | Terraform `cloudfoundry/cloudfoundry` | Papéis na org, spaces por value stream, papéis nos spaces, instâncias e service keys |
 | `playbooks/site.yml` | Ansible | Labels e annotations na org; auditoria de labels com inventário CSV |
+| Ativação das capabilities do Integration Suite | **Manual** (sem API pública) | Cloud Integration, API Management e Developer Portal |
 
 As camadas se falam só por **outputs** (o contrato entre elas). Detalhes em
-[docs/03 (governança)](docs/03-governanca.md), [docs/04 (Terraform)](docs/04-terraform-boas-praticas.md)
+[docs/03 (governança e identidade)](docs/03-governanca.md), [docs/04 (Terraform)](docs/04-terraform-boas-praticas.md)
 e [docs/05 (Ansible)](docs/05-ansible-boas-praticas.md).
 
 ## Estrutura
@@ -56,12 +64,15 @@ e [docs/05 (Ansible)](docs/05-ansible-boas-praticas.md).
 │   │   ├── finops-labels/        # taxonomia de labels nos formatos BTP e CF (módulo puro)
 │   │   ├── btp-directory/        # directory + cota + Directory Admin/Viewer
 │   │   ├── btp-subaccount/       # subaccount + entitlements + role collections
-│   │   ├── btp-services/         # assinaturas, instâncias e service keys no subaccount
+│   │   ├── btp-identity/         # onboarding do IAS + trust + IAS como IdP padrão
+│   │   ├── btp-apps/             # assinaturas + role collections no usuário do IAS
+│   │   ├── btp-services/         # instâncias e service keys no subaccount (Service Manager)
 │   │   ├── btp-cloudfoundry/     # ambiente CF (org) e endpoint da API
 │   │   ├── cf-org-access/        # papéis na org (membros primeiro)
 │   │   └── cf-space/             # space + papéis + instâncias + service keys
 │   └── stacks/                   # root modules: um estado por camada
 │       ├── 10-btp-account/
+│       ├── 15-btp-services/
 │       └── 20-cloudfoundry/
 ├── ansible/
 │   ├── playbooks/site.yml        # preflight -> contexto -> login CF -> labels na org -> auditoria
@@ -102,9 +113,11 @@ read -rs BTP_PASSWORD && export BTP_PASSWORD   # digitação oculta
 ```
 
 ```bash
-make account-plan      # revise: directory, subaccount, entitlements, papéis, serviços, org
+make account-plan      # revise: directory, subaccount, entitlements, papéis, org
 make account-apply
-make cf-plan           # revise: papéis de org e space, instâncias, service keys
+make services-plan     # revise: IAS, trust, IdP padrão, assinaturas, roles, instâncias de plataforma
+make services-apply    # chega o e-mail de ativação do IAS: ative a conta antes de abrir as apps
+make cf-plan           # revise: papéis de org e space, spaces por value stream, instâncias, keys
 make cf-apply
 make configure-check   # dry-run do Ansible
 make configure         # labels na org + auditoria (gera .build/finops/cf-inventory.csv)
@@ -114,10 +127,13 @@ O resultado da auditoria termina assim:
 
 ```text
 TASK [finops_compliance : Show the compliance summary]
-ok: [localhost] => msg: 15 recursos auditados, 0 sem labels obrigatórias.
+ok: [localhost] => msg: 71 recursos auditados, 0 sem labels obrigatórias.
 ```
 
-Para desmontar (stack 20 e depois stack 10):
+Depois, ative no Integration Suite as capabilities **Cloud Integration** e
+**API Management** (com Developer Portal), entrando com o usuário do IAS.
+
+Para desmontar (stacks 20, 15 e 10, nessa ordem):
 
 ```bash
 make down
@@ -134,7 +150,7 @@ make check                       # lint + validate + test (o mesmo que o CI)
 
 | Ferramenta | O que garante |
 | --- | --- |
-| `terraform test` + `mock_provider` | 35 testes da lógica dos módulos (nomes, labels, RBAC, chaves de `for_each`) sem tocar no BTP |
+| `terraform test` + `mock_provider` | 37 testes da lógica dos módulos (nomes, labels, RBAC, chaves de `for_each`) sem tocar no BTP |
 | `tflint` (preset `all`) | Variáveis tipadas e documentadas, versões declaradas, nada sem uso |
 | `ansible-lint` (perfil `production`) | FQCN, `changed_when`, prefixo de variáveis por role, permissões |
 | `trivy config` | Misconfiguração e segredos versionados |
@@ -144,7 +160,7 @@ make check                       # lint + validate + test (o mesmo que o CI)
 
 1. [Pré-requisitos da conta trial e rede](docs/01-pre-requisitos-trial.md)
 2. [Autenticação: usuário/senha, alternativas e CI/CD](docs/02-autenticacao.md)
-3. [Governança: nomes, labels de FinOps e permissões](docs/03-governanca.md)
+3. [Governança: nomes, labels de FinOps, identidade e permissões](docs/03-governanca.md)
 4. [Boas práticas de Terraform aplicadas aqui](docs/04-terraform-boas-praticas.md)
 5. [Boas práticas de Ansible aplicadas aqui](docs/05-ansible-boas-praticas.md)
 6. [Troubleshooting](docs/06-troubleshooting.md)

@@ -1,4 +1,4 @@
-# 3. Governança: nomes, labels de FinOps e permissões
+# 3. Governança: nomes, labels de FinOps, identidade e permissões
 
 Os três temas são definidos **uma única vez** e aplicados em todos os recursos.
 Mudar uma regra é mudar um módulo, não caçar strings pelo código.
@@ -21,8 +21,8 @@ Padrão: **`<workload>-<ambiente>-<região>[-<instância>]`**
 | Subaccount (nome) | Resource group | `<workload>-<ambiente>-<região>` | `application-integration-qa-us10` |
 | Subaccount (subdomínio) | Nome globalmente único | `<nome>-<sufixo>` | `application-integration-qa-us10-203d9eeb` |
 | Org Cloud Foundry | — | `<nome>-<sufixo>` | `application-integration-qa-us10-203d9eeb` |
-| Space | — | `<finalidade>` | `integration` |
-| Instância de serviço | Recurso com prefixo de tipo | `<abrev>-<workload>-<ambiente>-<região>-<nnn>` | `dest-application-integration-qa-us10-001` |
+| Space | — | `<value stream>` ou `shared-services` | `o2c`, `p2p`, `r2r`, `h2r`, `d2o` |
+| Instância de serviço | Recurso com prefixo de tipo | `<abrev>[-<value stream>]-<workload>-<ambiente>-<região>-<nnn>` | `uaa-o2c-application-integration-qa-us10-001` |
 | Service key | — | `sk-<consumidor>` | `sk-cicd`, `sk-integration-suite` |
 
 Decisões e motivos:
@@ -34,8 +34,11 @@ Decisões e motivos:
 - **Sufixo estável, nunca aleatório**: subdomínio e nome de org são únicos *na
   região inteira*, entre todos os clientes SAP. O sufixo vem do global account
   (`203d9eebtrial-ga` → `203d9eeb`), então não muda a cada recriação.
-- **Space sem ambiente**: o ambiente já está no nome da org; o space diz a
-  *finalidade* (`integration`, `monitoring`...).
+- **Space por value stream da SAP** (order-to-cash, procure-to-pay,
+  record-to-report, hire-to-retire, design-to-operate): o ambiente já está no
+  nome da org, e o space diz a qual processo de negócio o recurso serve.
+- **Value stream no nome da instância**: garante unicidade entre spaces, o que é
+  obrigatório para o `xsappname` do XSUAA (único por subaccount).
 - **Abreviação por tipo de serviço** (`dest`, `uaa`, `conn`, `ff`, `ans`, `html5`,
   `log`, `audit`, `sm`...): igual aos prefixos `rg-`, `st-`, `kv-` do CAF. A
   tabela completa fica em `modules/naming/main.tf`.
@@ -64,6 +67,7 @@ Taxonomia única (baseada nas recomendações de *cost allocation* da FinOps Fou
 | `resource-type` | `cf-space`, `service-key`... | Filtrar o inventário por tipo (só CF) | (automática) |
 | `service` / `plan` | `destination` / `lite` | Custo por serviço e plano (só CF; no BTP são atributos nativos) | (automática) |
 | `consumer` | `cicd` | Quem usa cada service key (BTP e CF) | (automática) |
+| `value-stream` | `o2c`, `shared` | Custo por processo de negócio (spaces, instâncias e keys do CF) | (automática) |
 
 ### Onde cada label é aplicada
 
@@ -124,7 +128,44 @@ e falha se algum recurso estiver sem label obrigatória.
 
 ---
 
-## 3. Permissões (RBAC por persona)
+## 3. Identidade: duas portas de entrada
+
+| Porta | Quem usa | Identity provider | Onde é configurada |
+| --- | --- | --- | --- |
+| **Plataforma** | Cockpit, btp CLI, cf CLI, Terraform | SAP ID service (padrão do global account) | Global account |
+| **Aplicações** | Integration Suite, BAS, Work Zone e demais assinaturas | **SAP Cloud Identity Services (IAS)** | Stack 15 |
+
+O stack 15 monta a porta das aplicações de ponta a ponta:
+
+1. **Onboarding do IAS** (`sap-identity-services-onboarding`): cria ou vincula
+   o tenant e envia o **e-mail de ativação** para quem assinou.
+2. **Trust OIDC** do subaccount com o tenant (`btp_subaccount_trust_configuration`).
+3. **IAS como IdP padrão** (`btp_subaccount_security_settings.default_identity_provider`):
+   quem abre uma aplicação vai direto para o login do IAS.
+4. **SAP ID service fora do login das aplicações**: o trust `sap.default` é
+   **importado** (bloco `import`) e recebe `available_for_user_logon = false`.
+   O provider trata o `sap.default` de forma especial: sem `identity_provider` e
+   sem apagar no `destroy`.
+5. **Role collections das aplicações no usuário do IAS** (`origin` = origin do
+   trust), atribuídas assim que cada assinatura existe. Cada atribuição
+   referencia a SUA assinatura, então a role do BAS não espera o Integration Suite.
+
+A porta da plataforma continua no SAP ID service de propósito: o Terraform
+autentica com usuário e senha desse IdP. Levar a plataforma para o IAS é uma
+configuração do **global account** (trust para usuários de plataforma) e
+exigiria trocar a autenticação do Terraform (veja [docs/02](02-autenticacao.md)).
+
+| Aplicação | Role collections atribuídas ao usuário do IAS |
+| --- | --- |
+| Integration Suite | `Integration_Provisioner` (depois da ativação: `PI_*`, `APIPortal.*`, `AuthGroup.*`) |
+| Business Application Studio | `Business_Application_Studio_Administrator`, `_Developer`, `_Extension_Deployer` |
+| Work Zone, standard edition | `Launchpad_Admin` |
+| Build Code | `Build Code Administrator`, `Build Code Developer` |
+| HANA Cloud Tools | `SAP HANA Cloud Administrator` |
+| Automation Pilot | `AutomationPilot_Admin`, `AutomationPilot_Developer` |
+| Demais (Build Apps, Process Automation, CI/CD, Cloud TMS, Audit Log Viewer, Feature Flags) | Descobertas depois da assinatura com `btp list security/role-collection` e incluídas em `subscriptions` |
+
+## 4. Permissões (RBAC por persona)
 
 Ninguém recebe papel avulso: cada pessoa entra numa **persona**, e cada persona
 recebe um conjunto coerente de papéis em todos os níveis.

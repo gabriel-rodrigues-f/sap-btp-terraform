@@ -104,9 +104,10 @@ variable "cf_environment_plan" {
 
 variable "entitlements" {
   description = <<-EOT
-    Planos liberados para o directory E para o subaccount (global account ->
-    directory -> subaccount). Os padrões são planos ELASTIC/APPLICATION da trial,
-    que não consomem cota numérica.
+    Catálogo de planos liberados para o directory E para o subaccount
+    (global account -> directory -> subaccount). Planos ELASTIC/APPLICATION
+    não levam amount; planos com cota numérica (SERVICE/QUOTA_BASED) levam.
+    Levantado com `make discover` na trial; ajuste ao catálogo da sua conta.
   EOT
   type = list(object({
     service_name = string
@@ -114,50 +115,59 @@ variable "entitlements" {
     amount       = optional(number)
   }))
   default = [
-    { service_name = "cloudfoundry", plan_name = "trial" }, # ambiente CF (org)
+    # --- Ambiente ---------------------------------------------------------
+    { service_name = "cloudfoundry", plan_name = "trial" },
+
+    # --- Aplicações SaaS (assinaturas, stack 15) ---------------------------
+    { service_name = "integrationsuite-trial", plan_name = "trial", amount = 1 },
+    { service_name = "sapappstudiotrial", plan_name = "trial" },
+    { service_name = "SAPLaunchpad", plan_name = "standard" },
+    { service_name = "build-code", plan_name = "free" },
+    { service_name = "sap-build-apps", plan_name = "free", amount = 1 },
+    { service_name = "process-automation", plan_name = "free" },
+    { service_name = "hana-cloud-tools", plan_name = "tools" },
+    { service_name = "sap-identity-services-onboarding", plan_name = "default" },
+    { service_name = "cicd-app", plan_name = "trial", amount = 1 },
+    { service_name = "alm-ts", plan_name = "lite" },
+    { service_name = "automationpilot", plan_name = "free" },
+    { service_name = "auditlog-viewer", plan_name = "free" },
+    { service_name = "feature-flags-dashboard", plan_name = "dashboard" },
+
+    # --- Serviços de runtime (instâncias no Cloud Foundry, stack 20) -------
     { service_name = "destination", plan_name = "lite" },
     { service_name = "xsuaa", plan_name = "application" },
     { service_name = "connectivity", plan_name = "lite" },
+    { service_name = "html5-apps-repo", plan_name = "app-host" },
+    { service_name = "html5-apps-repo", plan_name = "app-runtime" },
+    { service_name = "application-logs", plan_name = "lite" },
+    { service_name = "autoscaler", plan_name = "standard" },
     { service_name = "feature-flags", plan_name = "lite" },
     { service_name = "alert-notification", plan_name = "standard" },
-    { service_name = "html5-apps-repo", plan_name = "app-host" },
-    { service_name = "application-logs", plan_name = "lite" },
+    { service_name = "jobscheduler", plan_name = "free", amount = 1 },
+    { service_name = "credstore", plan_name = "trial", amount = 1 },
+    { service_name = "theming", plan_name = "standard" },
+    { service_name = "transport", plan_name = "standard" },
+    { service_name = "identity", plan_name = "application" },
+    { service_name = "process-automation-service", plan_name = "standard" },
+    { service_name = "document-translation", plan_name = "trial" },
+    { service_name = "business-entity-recognition-trial", plan_name = "standard" },
+    { service_name = "data-attribute-recommendation-trial", plan_name = "standard" },
+    { service_name = "redis-cache", plan_name = "trial", amount = 1 },
+    { service_name = "postgresql-db", plan_name = "trial", amount = 1 },
+
+    # --- Plataforma (instâncias no nível do subaccount, stack 15) ----------
     { service_name = "auditlog-management", plan_name = "default" },
     { service_name = "service-manager", plan_name = "subaccount-audit" },
-    { service_name = "feature-flags-dashboard", plan_name = "dashboard" }, # assinaturas SaaS
-    { service_name = "auditlog-viewer", plan_name = "free" },
-    { service_name = "automationpilot", plan_name = "free" },
+    { service_name = "service-manager", plan_name = "subaccount-admin" },
+    { service_name = "cis", plan_name = "local" },
+    { service_name = "cis", plan_name = "central" },
+    { service_name = "xsuaa", plan_name = "apiaccess" },
+
+    # --- Integration Suite (instâncias após ativar as capabilities, stack 30)
+    { service_name = "it-rt", plan_name = "api" },
+    { service_name = "it-rt", plan_name = "integration-flow" },
+    { service_name = "apimanagement-apiportal-trial", plan_name = "apiportal-apiaccess" },
+    { service_name = "apimanagement-devportal-trial", plan_name = "devportal-apiaccess" },
   ]
 }
 
-variable "subscriptions" {
-  description = "Assinaturas SaaS (nome TÉCNICO da app, veja `btp list accounts/subscription`)."
-  type = list(object({
-    app_name   = string
-    plan_name  = string
-    parameters = optional(string)
-  }))
-  default = [
-    { app_name = "feature-flags-dashboard", plan_name = "dashboard" },
-    { app_name = "auditlog-viewer", plan_name = "free" },
-    { app_name = "automationpilot", plan_name = "free" },
-  ]
-}
-
-variable "service_instances" {
-  description = <<-EOT
-    Instâncias no nível do SUBACCOUNT (Service Manager), para consumo fora do
-    Cloud Foundry (SIEM, ferramentas de FinOps, pipelines). 'keys' = consumidores.
-  EOT
-  type = map(object({
-    offering   = string
-    plan       = string
-    instance   = optional(string, "001")
-    parameters = optional(string)
-    keys       = optional(list(string), [])
-  }))
-  default = {
-    auditlog = { offering = "auditlog-management", plan = "default", keys = ["siem"] }
-    sm-audit = { offering = "service-manager", plan = "subaccount-audit", keys = ["finops-reporting"] }
-  }
-}

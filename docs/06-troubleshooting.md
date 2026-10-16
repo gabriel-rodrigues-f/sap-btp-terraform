@@ -15,6 +15,9 @@
 | `cloudfoundry_org_role`/`space_role`: usuário não encontrado | Usuário nunca logou no Cloud Foundry desta região (não existe no UAA) | Peça para a pessoa fazer `cf login` uma vez, ou use `user_origin` correto se for IdP customizado |
 | Criação de instância CF retorna 403 | Usuário do Terraform sem `space_developer` | O stack 20 já dá esse papel ao deployer; confira `terraform output access` no stack 10 |
 | `Provider produced inconsistent result after apply` em `btp_subaccount_service_instance` (`.labels[...]`) | Bug do provider 1.27.0: a última chave de label volta com uma aspa extra | Mantenha `label_service_manager_resources = false` (padrão); o próximo apply recria as instâncias marcadas como *tainted* |
+| Role collection de uma aplicação "not found" | A role collection só existe depois que a assinatura termina, ou o nome mudou | Confira com `btp list security/role-collection --subaccount <id>` e ajuste `subscriptions` no stack 15 |
+| Aplicação abre com tela de escolha de IdP | O IAS ainda não é o IdP padrão ou o `sap.default` continua disponível | Confira `btp list security/trust --subaccount <id>` e o output `ias_origin` do stack 15 |
+| Não chegou o e-mail de ativação do IAS | O tenant já existia para o global account (vinculado, não criado) | Acesse `ias_admin_console` e use "Esqueci minha senha", ou peça o reenvio no IAS |
 | Ansible: `Recursos sem labels de FinOps` | Recurso criado à mão no cockpit, sem labels | Crie pelo Terraform ou rotule com `cf set-label`; o CSV em `.build/finops/` mostra o que falta |
 | Todo `plan` mostra mudança | Valor volátil (`timestamp()`) ou atributo alterado fora do Terraform | `make drift` mostra o que mudou; remova valores voláteis |
 | Trial "suspended" | 30 dias sem extensão | Estenda no cockpit da trial |

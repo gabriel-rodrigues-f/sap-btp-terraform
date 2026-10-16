@@ -4,10 +4,6 @@ variables {
   subaccount_id = "00000000-0000-0000-0000-000000000000"
   labels        = { "cost-center" = ["cc-1001"] }
 
-  subscriptions = [
-    { app_name = "feature-flags-dashboard", plan_name = "dashboard" },
-  ]
-
   service_instances = {
     audit = {
       name     = "audit-application-integration-qa-us10-001"
@@ -56,15 +52,6 @@ run "uma_service_key_por_consumidor" {
   assert {
     condition     = btp_subaccount_service_binding.this["audit/siem"].name == "sk-siem"
     error_message = "Nome da key é sempre sk-<consumidor>, com ou sem labels."
-  }
-}
-
-run "assinatura_indexada_por_app_e_plano" {
-  command = plan
-
-  assert {
-    condition     = contains(keys(btp_subaccount_subscription.this), "feature-flags-dashboard/dashboard")
-    error_message = "Assinatura indexada por app/plan."
   }
 }
 

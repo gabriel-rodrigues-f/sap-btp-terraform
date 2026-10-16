@@ -16,23 +16,36 @@ locals {
 
   # Abreviações por tipo de serviço (equivalente aos prefixos do CAF: rg-, st-, kv-...).
   default_abbreviations = {
-    "alert-notification"  = "ans"
-    "application-logs"    = "log"
-    "auditlog-management" = "audit"
-    "autoscaler"          = "asc"
-    "connectivity"        = "conn"
-    "credstore"           = "cred"
-    "destination"         = "dest"
-    "feature-flags"       = "ff"
-    "hana"                = "hdi"
-    "hana-cloud"          = "hana"
-    "html5-apps-repo"     = "html5"
-    "jobscheduler"        = "job"
-    "objectstore"         = "obj"
-    "saas-registry"       = "saas"
-    "service-manager"     = "sm"
-    "transport"           = "tms"
-    "xsuaa"               = "uaa"
+    "alert-notification"                  = "ans"
+    "apimanagement-apiportal-trial"       = "apim"
+    "apimanagement-devportal-trial"       = "devportal"
+    "application-logs"                    = "log"
+    "auditlog-management"                 = "audit"
+    "autoscaler"                          = "asc"
+    "build-workzone-standard"             = "wz"
+    "business-entity-recognition-trial"   = "ber"
+    "cis"                                 = "cis"
+    "connectivity"                        = "conn"
+    "credstore"                           = "cred"
+    "data-attribute-recommendation-trial" = "dar"
+    "destination"                         = "dest"
+    "document-translation"                = "dtr"
+    "feature-flags"                       = "ff"
+    "hana"                                = "hdi"
+    "hana-cloud"                          = "hana"
+    "html5-apps-repo"                     = "html5"
+    "identity"                            = "ias"
+    "it-rt"                               = "cpi"
+    "jobscheduler"                        = "job"
+    "objectstore"                         = "obj"
+    "postgresql-db"                       = "pg"
+    "process-automation-service"          = "spa"
+    "redis-cache"                         = "redis"
+    "saas-registry"                       = "saas"
+    "service-manager"                     = "sm"
+    "theming"                             = "thm"
+    "transport"                           = "tms"
+    "xsuaa"                               = "uaa"
   }
   abbreviations = merge(local.default_abbreviations, var.abbreviations)
 
@@ -40,6 +53,6 @@ locals {
   # vale cadastrar para manter os nomes curtos.
   service_instances = {
     for key, si in var.service_instances :
-    key => "${lookup(local.abbreviations, si.offering, si.offering)}-${local.base}-${si.instance}"
+    key => join("-", compact([lookup(local.abbreviations, si.offering, si.offering), si.scope, local.base, si.instance]))
   }
 }

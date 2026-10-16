@@ -1,15 +1,13 @@
-# Opcional: os padrões já criam o space "integration" com 7 instâncias e 6 service keys.
-# Copie para terraform.tfvars se quiser mudar.
+# Opcional: os padrões criam 5 spaces de value stream (o2c, p2p, r2r, h2r, d2o)
+# com o kit de aplicação e o space shared-services com os demais serviços.
 
-# spaces = {
-#   integration = {
-#     service_instances = {
-#       destination = { offering = "destination", plan = "lite", keys = ["cicd"] }
-#     }
-#   }
-#   monitoring = {
-#     service_instances = {
-#       alert-notification = { offering = "alert-notification", plan = "standard", keys = ["pagerduty"] }
-#     }
-#   }
+# Adicionar um value stream:
+# value_streams = {
+#   o2c = "order-to-cash"
+#   l2c = "lead-to-cash"
+# }
+
+# Mudar o kit de cada value stream:
+# value_stream_services = {
+#   destination = { offering = "destination", plan = "lite", keys = ["cicd"] }
 # }

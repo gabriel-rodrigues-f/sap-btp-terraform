@@ -9,6 +9,7 @@ variables {
     destination = { offering = "destination" }
     xsuaa_api   = { offering = "xsuaa", instance = "002" }
     custom      = { offering = "meu-servico-novo" }
+    o2c_xsuaa   = { offering = "xsuaa", scope = "o2c" }
   }
 }
 
@@ -43,6 +44,11 @@ run "gera_nomes_no_padrao_caf" {
   assert {
     condition     = output.service_instances["custom"] == "meu-servico-novo-application-integration-qa-us10-001"
     error_message = "Serviço sem abreviação usa o próprio nome."
+  }
+
+  assert {
+    condition     = output.service_instances["o2c_xsuaa"] == "uaa-o2c-application-integration-qa-us10-001"
+    error_message = "O escopo (value stream) entra logo depois da abreviação."
   }
 }
 

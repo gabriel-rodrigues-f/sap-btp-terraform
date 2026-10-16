@@ -1,0 +1,8 @@
+# Opcional: os padrões já assinam todas as aplicações da trial e criam as
+# instâncias de plataforma. Copie para terraform.tfvars se quiser mudar.
+
+# Outros usuários do IAS que também devem ser admin das aplicações:
+# app_users = ["voce@exemplo.com", "colega@exemplo.com"]
+
+# Manter o SAP ID service como opção de login (não recomendado):
+# disable_default_idp_logon = false

@@ -14,25 +14,6 @@ variable "labels" {
   }
 }
 
-variable "subscriptions" {
-  description = <<-EOT
-    Assinaturas de aplicações SaaS. Use o NOME TÉCNICO da app (btp list
-    accounts/subscription), que pode diferir do nome do entitlement.
-    'parameters' é uma string JSON.
-  EOT
-  type = list(object({
-    app_name   = string
-    plan_name  = string
-    parameters = optional(string)
-  }))
-  default = []
-
-  validation {
-    condition     = alltrue([for s in var.subscriptions : s.parameters == null || can(jsondecode(s.parameters))])
-    error_message = "subscriptions[*].parameters deve ser um JSON válido."
-  }
-}
-
 variable "service_instances" {
   description = <<-EOT
     Instâncias no nível do SUBACCOUNT (Service Manager, ambiente "Other"),

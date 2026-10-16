@@ -54,11 +54,14 @@ variable "unique_suffix" {
 
 variable "service_instances" {
   description = <<-EOT
-    Instâncias que precisam de nome (chave lógica => serviço e número de instância).
-    O nome final segue <abreviação>-<workload>-<ambiente>-<região>-<nnn>.
+    Instâncias que precisam de nome (chave lógica => serviço, escopo e número).
+    Nome final: <abreviação>[-<escopo>]-<workload>-<ambiente>-<região>-<nnn>.
+    'scope' é opcional (ex.: o value stream o2c) e garante nomes únicos entre spaces,
+    o que importa para serviços como o xsuaa (xsappname único por subaccount).
   EOT
   type = map(object({
     offering = string
+    scope    = optional(string)
     instance = optional(string, "001")
   }))
   default = {}

@@ -1,16 +1,11 @@
 #
-# Serviços consumidos no nível do SUBACCOUNT:
-#   - assinaturas SaaS (aplicações multitenant da SAP)
-#   - instâncias via Service Manager (ambiente "Other": servem a qualquer
-#     runtime ou a sistemas externos, como Integration Suite e pipelines)
-#   - service keys (bindings) por CONSUMIDOR, cada uma rastreável por label
+# Instâncias no nível do SUBACCOUNT, via Service Manager (ambiente "Other"):
+# servem a qualquer runtime ou a sistemas externos (SIEM, FinOps, pipelines),
+# sem depender de Cloud Foundry ou Kyma. Uma service key por CONSUMIDOR.
+# (Assinaturas SaaS ficam no módulo btp-apps.)
 #
 
 locals {
-  subscriptions = {
-    for s in var.subscriptions : "${s.app_name}/${s.plan_name}" => s
-  }
-
   # Uma service key por consumidor: rotacionar ou revogar o acesso de um
   # consumidor não afeta os outros, e o custo/uso fica atribuível.
   service_keys = merge([
@@ -22,22 +17,6 @@ locals {
       }
     }
   ]...)
-}
-
-resource "btp_subaccount_subscription" "this" {
-  for_each = local.subscriptions
-
-  subaccount_id = var.subaccount_id
-  app_name      = each.value.app_name
-  plan_name     = each.value.plan_name
-  parameters    = each.value.parameters
-
-  # Assinaturas NÃO aceitam labels na API do BTP. O custo delas é atribuído
-  # pelas labels do subaccount (veja docs/03-governanca.md).
-  timeouts = {
-    create = "30m"
-    delete = "30m"
-  }
 }
 
 resource "btp_subaccount_service_instance" "this" {

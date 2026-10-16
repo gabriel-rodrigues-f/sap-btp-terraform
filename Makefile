@@ -2,7 +2,8 @@
 #
 # Fluxo completo (credenciais em BTP_USERNAME / BTP_PASSWORD, veja docs/02):
 #   make setup
-#   make account-plan account-apply   # stack 10: directory, subaccount, serviços, org CF
+#   make account-plan account-apply   # stack 10: directory, subaccount, entitlements, org CF
+#   make services-plan services-apply # stack 15: IAS, trust, assinaturas + roles, instâncias
 #   make cf-plan cf-apply             # stack 20: papéis de org, spaces, instâncias, keys
 #   make configure                    # Ansible: labels na org + auditoria de FinOps
 #   make down                         # desfaz tudo, na ordem inversa
@@ -17,6 +18,7 @@ TFLINT_VERSION := 0.64.0
 VENV           := .venv
 BIN            := $(CURDIR)/$(VENV)/bin
 ACCOUNT_STACK  := terraform/stacks/10-btp-account
+SERVICES_STACK := terraform/stacks/15-btp-services
 CF_STACK       := terraform/stacks/20-cloudfoundry
 MODULES        := $(wildcard terraform/modules/*)
 ANSIBLE        := cd ansible && PATH="$(BIN):$$PATH" ansible-playbook
@@ -90,6 +92,23 @@ account-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 10
 	@[ -f $(ACCOUNT_STACK)/tfplan ] || { echo "Sem plano. Rode: make account-plan"; exit 1; }
 	$(TF) -chdir=$(ACCOUNT_STACK) apply -input=false tfplan
 	@rm -f $(ACCOUNT_STACK)/tfplan
+	@echo; echo "Próximo passo: make services-plan"
+
+##@ Terraform - stack 15 (IAS, trust, assinaturas, instâncias de plataforma)
+
+.PHONY: services-init
+services-init: ## terraform init do stack 15
+	$(TF) -chdir=$(SERVICES_STACK) init -input=false
+
+.PHONY: services-plan
+services-plan: check-creds services-init ## Gera o plano do stack 15 em tfplan
+	$(TF) -chdir=$(SERVICES_STACK) plan -input=false -out=tfplan
+
+.PHONY: services-apply
+services-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 15
+	@[ -f $(SERVICES_STACK)/tfplan ] || { echo "Sem plano. Rode: make services-plan"; exit 1; }
+	$(TF) -chdir=$(SERVICES_STACK) apply -input=false tfplan
+	@rm -f $(SERVICES_STACK)/tfplan
 	@echo; echo "Próximo passo: make cf-plan"
 
 ##@ Terraform - stack 20 (Cloud Foundry: papéis, spaces, serviços)
@@ -112,6 +131,7 @@ cf-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 20
 .PHONY: drift
 drift: check-creds ## Detecta drift (mudanças feitas fora do Terraform) nos dois stacks
 	$(TF) -chdir=$(ACCOUNT_STACK) plan -refresh-only -input=false -detailed-exitcode
+	$(TF) -chdir=$(SERVICES_STACK) plan -refresh-only -input=false -detailed-exitcode
 	$(CF_ENV) $(TF) -chdir=$(CF_STACK) plan -refresh-only -input=false -detailed-exitcode
 
 ##@ Ansible (configuração e governança)
@@ -127,8 +147,9 @@ configure: check-creds ## Labels na org + auditoria de FinOps (relatório em .bu
 ##@ Desmontagem
 
 .PHONY: down
-down: check-creds ## Destrói stack 20 e depois stack 10 (pede confirmação em cada um)
+down: check-creds ## Destrói os stacks na ordem inversa: 20, 15 e 10 (pede confirmação em cada um)
 	$(CF_ENV) $(TF) -chdir=$(CF_STACK) destroy -input=false
+	$(TF) -chdir=$(SERVICES_STACK) destroy -input=false
 	$(TF) -chdir=$(ACCOUNT_STACK) destroy -input=false
 
 ##@ Qualidade (não precisam de credenciais)
@@ -139,7 +160,7 @@ fmt: ## Formata o código Terraform
 
 .PHONY: validate
 validate: ## terraform validate em módulos e stacks (sem backend)
-	@for d in $(MODULES) $(ACCOUNT_STACK) $(CF_STACK); do \
+	@for d in $(MODULES) $(ACCOUNT_STACK) $(SERVICES_STACK) $(CF_STACK); do \
 	  echo "==> $$d"; \
 	  $(TF) -chdir=$$d init -backend=false -input=false >/dev/null; \
 	  $(TF) -chdir=$$d validate; \
