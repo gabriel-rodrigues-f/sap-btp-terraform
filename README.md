@@ -102,12 +102,18 @@ make setup                       # .venv com Ansible e linters, tflint e coleç�
 Edite `terraform/stacks/10-btp-subaccount/terraform.tfvars` e informe `globalaccount`
 (o subdomínio, visível em `btp --info`) e `admins` (seu e-mail).
 
+Exporte as credenciais (usuário e senha do SAP ID service) no terminal.
+A senha nunca vai para arquivo ([detalhes](docs/02-autenticacao.md)):
+
 ```bash
-make login-btp                   # login no navegador (funciona com SAP Universal ID)
-make discover                    # (opcional) confira subaccounts e entitlements livres
+export BTP_USERNAME="voce@exemplo.com"
+read -rs BTP_PASSWORD && export BTP_PASSWORD   # digitação oculta
+```
+
+```bash
+make login-btp discover          # (opcional) confira subaccounts e entitlements livres
 make account-plan                # revise o plano
 make account-apply               # cria subaccount, entitlements, destination e org CF
-make login-cf                    # login no CF da nova org (código temporário no navegador)
 make space-plan
 make space-apply                 # cria space, papéis e o serviço destination
 make deploy-check                # dry-run do Ansible
@@ -151,7 +157,7 @@ make check                       # lint + validate + test (o mesmo que o CI)
 ## Documentação
 
 1. [Pré-requisitos da conta trial e rede](docs/01-pre-requisitos-trial.md)
-2. [Autenticação: Universal ID, SSO e CI/CD](docs/02-autenticacao.md)
+2. [Autenticação: usuário/senha, alternativas e CI/CD](docs/02-autenticacao.md)
 3. [Boas práticas de Terraform aplicadas aqui](docs/03-terraform-boas-praticas.md)
 4. [Boas práticas de Ansible aplicadas aqui](docs/04-ansible-boas-praticas.md)
 5. [Troubleshooting](docs/05-troubleshooting.md)
@@ -169,6 +175,6 @@ A primeira versão deste repositório tinha os módulos `0-directories` a
 | Versões exatas em todos os módulos (`= 1.10.0`) | Módulos travavam upgrades; o root não tinha lock file | Módulos com `>=`, stacks com `~>` e `.terraform.lock.hcl` versionado |
 | `depends_on` entre módulos | Adia todos os data sources para o apply e esconde a dependência real | Dependência propagada pelo próprio output (`depends_on` no output) |
 | Variáveis sem tipo, recebendo o objeto inteiro (`var.subaccount.id`) | Acoplamento e erros só em tempo de apply | Tipos explícitos, `validation` e só os IDs necessários |
-| Senha do CF como variável Terraform | Segredo em tfvars, histórico do shell e possivelmente no estado | Sessão SSO dos CLIs, nada de senha no código |
+| Senha do CF como variável Terraform | Segredo em tfvars, histórico do shell e possivelmente no estado | Credenciais só por variáveis de ambiente, lidas direto pelos providers e pelo `cf auth` |
 | Recursos em `resource "x" "app_dev_rpa"` fixos | Para cada item novo, era preciso copiar e colar | `for_each` com chaves estáveis a partir de listas e mapas |
 | Sem testes, sem lint, sem CI | — | `terraform test`, tflint, ansible-lint, trivy, pre-commit e GitHub Actions |

@@ -9,3 +9,8 @@ app_instances: 1
 
 # Destination criada pelo Terraform (stack 10) que a app vai ler.
 app_destination_name: northwind
+
+# Credenciais: SEMPRE do ambiente, as mesmas usadas pelo Terraform.
+# Nunca escreva usuário/senha aqui (nem com ansible-vault, numa POC local).
+cf_target_username: "{{ lookup('ansible.builtin.env', 'BTP_USERNAME', default='') }}"
+cf_target_password: "{{ lookup('ansible.builtin.env', 'BTP_PASSWORD', default='') }}"

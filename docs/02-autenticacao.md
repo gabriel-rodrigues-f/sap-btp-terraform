@@ -1,48 +1,72 @@
-# 2. Autenticação: Universal ID, SSO e CI/CD
+# 2. Autenticação
 
-## O problema
+## Escolha desta POC: usuário e senha
 
-A documentação oficial do provider `SAP/btp` avisa que o fluxo
-usuário/senha **não é compatível com SAP Universal ID** (SAP Note 3085908) e
-que **2FA não é suportado** nesse fluxo. Contas trial criadas com e-mail
-pessoal costumam usar Universal ID. Portanto, `BTP_USERNAME`/`BTP_PASSWORD` não
-funcionam para você, e o mesmo vale para `cf login` com senha.
+Um único par de credenciais do SAP ID service, sempre por **variáveis de
+ambiente**. Nada de senha em código, tfvars, group_vars ou argumento de linha
+de comando.
 
-## A solução local: reaproveitar a sessão SSO dos CLIs
-
-| Camada | Login (no navegador) | Como o Terraform/Ansible reaproveita |
+| Quem usa | Variáveis que lê | De onde vêm |
 | --- | --- | --- |
-| BTP (stack 10) | `btp login --sso` (`make login-btp`) | `USE_BTPCLI_SESSION=true` (o Makefile exporta) |
-| Cloud Foundry (stack 20 e Ansible) | `cf login --sso` (`make login-cf`) | Bloco `provider "cloudfoundry" {}` **vazio** lê `~/.cf/config.json`; o Ansible usa o próprio cf CLI |
+| Provider BTP (stack 10) | `BTP_USERNAME`, `BTP_PASSWORD` | Você exporta no terminal |
+| Provider Cloud Foundry (stack 20) | `CF_USER`, `CF_PASSWORD` | O Makefile copia de `BTP_*` |
+| cf CLI no Ansible (`cf auth`) | `CF_USERNAME`, `CF_PASSWORD` | `group_vars` lê de `BTP_*` |
 
-Dois detalhes que custam tempo se você não souber:
+## Exportar as credenciais
 
-1. **O bloco do provider CF tem que ficar vazio.** Se você preencher só
-   `api_url`, o provider passa a exigir `user`/`password` ou token e ignora a
-   sessão do CLI. O endpoint vem da sessão (`cf login -a ...`).
-2. **O `cf login` precisa apontar para a org nova.** Por isso `make login-cf`
-   lê `cf_api_url` e `cf_org_name` dos outputs do stack 10. As roles
-   `preflight` e `cf_target` do Ansible conferem a sessão e o endpoint antes de
-   qualquer alteração.
+```bash
+export BTP_USERNAME="voce@exemplo.com"
+read -rs BTP_PASSWORD && export BTP_PASSWORD   # digitação oculta, não entra no histórico
+make check-creds
+```
 
-As sessões expiram. Se aparecer `Unknown session` ou `token expired`, repita o login.
+As variáveis valem só para aquele terminal. Para não digitar a senha toda vez,
+guarde-a no Keychain do macOS:
 
-## Nenhum segredo no repositório
+```bash
+security add-generic-password -a "$BTP_USERNAME" -s sap-btp -w    # pede a senha uma vez
+export BTP_PASSWORD="$(security find-generic-password -a "$BTP_USERNAME" -s sap-btp -w)"
+```
 
-- Não existe variável Terraform de senha neste código.
-- `terraform.tfvars` (com e-mails e IDs) está no `.gitignore`. Só os `.example` são versionados.
-- `*.tfstate` está no `.gitignore`. O estado pode conter dados sensíveis.
-- A task do Ansible que lê o token do cf CLI usa `no_log: true`.
-- `gitleaks` (pre-commit) e `trivy` (CI) barram segredos por engano.
+## Por que desse jeito
 
-## E no CI/CD?
+- **Sem variável Terraform para a senha.** Se existisse, a senha acabaria em
+  `terraform.tfvars`, no histórico do shell ou num `tfplan` salvo.
+  Os providers leem o ambiente sozinhos.
+- **`read -rs` em vez de `export BTP_PASSWORD=...`.** O comando digitado fica no
+  histórico do shell; a leitura oculta, não.
+- **O `cf auth` recebe a senha por ambiente, não por argumento.** Argumentos
+  aparecem em `ps` para qualquer usuário da máquina. A task ainda usa `no_log: true`.
+- **O provider CF tem `api_url` fixo (vindo do stack 10).** O plan não depende de
+  onde o cf CLI estava apontando.
+- `*.tfstate` e `terraform.tfvars` estão no `.gitignore`. `gitleaks` (pre-commit)
+  e `trivy` (CI) barram segredos versionados por engano.
 
-Sessão SSO é interativa, então não serve para pipeline. O caminho recomendado é:
+## Limitações do fluxo usuário/senha
+
+- **2FA não é suportado.** Se a conta tiver 2FA ativo, use uma das alternativas abaixo.
+- **SAP Universal ID.** A documentação do provider avisa que esse fluxo não é
+  compatível com Universal ID (SAP Note 3085908). Se aparecer `invalid credentials`
+  com a senha certa, use o **ID do usuário** (P-user, `P0000000000`) no lugar do
+  e-mail, com a senha desse usuário. O mesmo vale quando há mais de um usuário com o mesmo e-mail.
+
+## Alternativa: SSO
+
+Para contas com 2FA ou Universal ID sem senha de P-user:
+
+| Camada | Login | Configuração |
+| --- | --- | --- |
+| BTP | `btp login --sso` | `export USE_BTPCLI_SESSION=true` (sem `BTP_USERNAME`/`BTP_PASSWORD`) |
+| Cloud Foundry | `cf login --sso -a <api>` | `provider "cloudfoundry" {}` **sem** `api_url`: o provider passa a ler `~/.cf/config.json` |
+
+## CI/CD
+
+Em pipeline, use uma identidade técnica, nunca a sua:
 
 | Opção | Como | Quando usar |
 | --- | --- | --- |
-| **Usuário técnico** num IdP customizado (SAP Cloud Identity Services), sem Universal ID e sem 2FA | `BTP_USERNAME`, `BTP_PASSWORD`, `BTP_IDP` e, no CF, `CF_USER`, `CF_PASSWORD`, `CF_ORIGIN`, vindos do cofre de segredos do pipeline | Simples; exige rotação de senha |
-| **JWT Bearer Assertion + OIDC** do GitHub Actions | `BTP_ASSERTION` + `BTP_IDP` (BTP) e `assertion_token` (CF), com trust do IAS no emissor OIDC do GitHub | Sem nenhum segredo de longa duração; é o ideal |
+| **Usuário técnico** num IdP customizado (SAP Cloud Identity Services), sem 2FA | Os mesmos `BTP_USERNAME`/`BTP_PASSWORD` + `BTP_IDP` (e `CF_ORIGIN`), vindos do cofre de segredos do pipeline | Simples; exige rotação de senha |
+| **JWT Bearer Assertion + OIDC** do GitHub Actions | `BTP_ASSERTION` + `BTP_IDP` (BTP) e `CF_ASSERTION_TOKEN` (CF), com trust do IAS no emissor OIDC do GitHub | Sem segredo de longa duração; é o ideal |
 | **Certificado X.509** do usuário técnico | `tls_client_certificate`, `tls_client_key`, `tls_idp_url` | Quando OIDC não é possível |
 
 Referências:

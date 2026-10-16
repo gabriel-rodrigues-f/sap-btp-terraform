@@ -1,17 +1,12 @@
-# Nenhuma credencial no código. O provider resolve a autenticação por variáveis
-# de ambiente, nesta ordem de preferência para esta POC:
+# Autenticação básica (usuário/senha do SAP ID service), SEM credenciais no código.
+# O provider lê as variáveis de ambiente:
 #
-#   1. Sessão do btp CLI (local, compatível com SAP Universal ID e 2FA):
-#        btp login --sso
-#        export USE_BTPCLI_SESSION=true     # o Makefile já exporta
+#   export BTP_USERNAME="voce@exemplo.com"
+#   read -rs BTP_PASSWORD && export BTP_PASSWORD     # não vai para o histórico
 #
-#   2. Usuário técnico / S-user SEM Universal ID e sem 2FA (ex.: pipeline):
-#        export BTP_USERNAME=... BTP_PASSWORD=...
-#
-#   3. CI/CD sem senha, via IdP customizado (SAP Cloud Identity Services) + OIDC:
-#        export BTP_ASSERTION=<jwt> BTP_IDP=<tenant>.accounts.ondemand.com
-#
-# Detalhes e armadilhas em docs/02-autenticacao.md.
+# Nunca declare variável Terraform para a senha: ela acabaria em tfvars, no
+# histórico do shell ou no plano salvo. Outras opções (SSO, OIDC, X.509) e o
+# aviso sobre SAP Universal ID estão em docs/02-autenticacao.md.
 provider "btp" {
   globalaccount = var.globalaccount
 }

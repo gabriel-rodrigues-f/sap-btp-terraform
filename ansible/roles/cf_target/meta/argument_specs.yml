@@ -2,12 +2,12 @@
 # argument_specs: o Ansible valida as entradas da role ANTES de executá-la.
 argument_specs:
   main:
-    short_description: Aponta o cf CLI para a org/space corretos.
+    short_description: Autentica o cf CLI e aponta para a org/space corretos.
     options:
       cf_target_api_url:
         type: str
         required: true
-        description: Endpoint esperado da API Cloud Foundry.
+        description: Endpoint da API Cloud Foundry (output do Terraform).
       cf_target_org:
         type: str
         required: true
@@ -16,3 +16,12 @@ argument_specs:
         type: str
         required: true
         description: Nome do space.
+      cf_target_username:
+        type: str
+        required: true
+        description: Usuário do SAP ID service (vem de BTP_USERNAME).
+      cf_target_password:
+        type: str
+        required: true
+        no_log: true
+        description: Senha (vem de BTP_PASSWORD). Nunca em arquivo.

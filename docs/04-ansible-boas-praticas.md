@@ -63,9 +63,9 @@ o diff real do manifesto e se haveria push.
 
 | Role | Responsabilidade |
 | --- | --- |
-| `preflight` | CLIs instalados e sessão do cf CLI válida (falha cedo, com instrução) |
+| `preflight` | CLIs instalados (falha cedo, com instrução) |
 | `btp_context` | Outputs do Terraform → fato `btp_context_info` |
-| `cf_target` | Confere o endpoint e faz target na org/space certos |
+| `cf_target` | Autentica (`cf auth`), define o endpoint e faz target na org/space certos |
 | `cf_app` | Deploy idempotente por digest |
 | `smoke_test` | `/health` e leitura da destination criada pelo Terraform |
 
@@ -73,7 +73,9 @@ o diff real do manifesto e se haveria push.
 - Variáveis prefixadas com o nome da role (`cf_app_*`) evitam colisões.
 - Módulos com FQCN (`ansible.builtin.command`), `argv` em vez de string de shell
   (sem problemas de aspas ou injeção) e `changed_when` explícito em todo `command`.
-- `no_log: true` na task que lê o token OAuth.
+- `no_log: true` na autenticação; a senha vai para o `cf auth` por variável de
+  ambiente, nunca em `argv` (que aparece em `ps`). Ela vem de `BTP_PASSWORD`,
+  lida em `group_vars` com `lookup('ansible.builtin.env', ...)`.
 
 ## Parâmetros por ambiente
 
@@ -99,4 +101,4 @@ Existe a coleção `sap.sap_operations` (Red Hat), com módulos para BTP e Cloud
 Foundry (`btp_subaccount`, `cf_service_instance` e outros). Ela é uma
 alternativa para quem quer fazer tudo em Ansible. Aqui ficamos com o Terraform
 na infraestrutura, por causa de estado, plan e drift, e com o cf CLI no
-deploy, porque ele reaproveita a sessão SSO, compatível com Universal ID.
+deploy, porque é a ferramenta oficial e funciona igual na máquina local e no CI.

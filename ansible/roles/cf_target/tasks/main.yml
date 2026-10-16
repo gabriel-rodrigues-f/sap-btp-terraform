@@ -1,26 +1,35 @@
 ---
-# Garante que o cf CLI está apontando para o lugar certo ANTES de qualquer
-# alteração. Um `cf push` na org errada é um dos erros mais comuns (e caros).
+# Autentica o cf CLI (usuário/senha) e aponta para a org/space criados pelo
+# Terraform. Cada execução define o endpoint explicitamente: um `cf push` na
+# org errada é um dos erros mais comuns (e caros).
 
-- name: Read the API endpoint the cf CLI is pointing to
+- name: Fail with guidance when credentials are missing
+  ansible.builtin.fail:
+    msg: >-
+      Credenciais ausentes. Exporte BTP_USERNAME e BTP_PASSWORD no shell
+      (veja docs/02-autenticacao.md).
+  when: cf_target_username | length == 0 or cf_target_password | length == 0
+
+- name: Point the cf CLI to the API endpoint created by Terraform
   ansible.builtin.command:
-    argv: [cf, api]
-  register: cf_target_current_api
+    argv: [cf, api, "{{ cf_target_api_url }}"]
+  # Só muda o contexto LOCAL do CLI (~/.cf/config.json), nada no BTP.
   changed_when: false
   check_mode: false
 
-- name: Ensure the cf CLI points to the expected API endpoint
-  ansible.builtin.assert:
-    that:
-      - cf_target_api_url in cf_target_current_api.stdout
-    fail_msg: >-
-      O cf CLI aponta para outro endpoint. Esperado: {{ cf_target_api_url }}.
-      Rode `make login-cf`.
-    quiet: true
+- name: Authenticate with username and password
+  ansible.builtin.command:
+    argv: [cf, auth]
+  environment:
+    # Via ambiente, a senha não aparece na lista de processos (como apareceria em argv).
+    CF_USERNAME: "{{ cf_target_username }}"
+    CF_PASSWORD: "{{ cf_target_password }}"
+  changed_when: false
+  check_mode: false
+  no_log: true
 
 - name: Target the org and space created by Terraform
   ansible.builtin.command:
     argv: [cf, target, -o, "{{ cf_target_org }}", -s, "{{ cf_target_space }}"]
-  # Só muda o contexto LOCAL do CLI (~/.cf/config.json), nada no BTP.
   changed_when: false
   check_mode: false

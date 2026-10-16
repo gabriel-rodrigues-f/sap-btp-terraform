@@ -45,8 +45,3 @@ output "cf_org_name" {
   description = "Nome da org Cloud Foundry."
   value       = module.cloudfoundry.org_name
 }
-
-output "next_step" {
-  description = "Próximo passo: autenticar o cf CLI na org recém-criada."
-  value       = "cf login --sso -a ${module.cloudfoundry.api_endpoint} -o ${module.cloudfoundry.org_name}"
-}

@@ -18,7 +18,7 @@
 ## Descobrir os dados do seu global account
 
 ```bash
-btp login --sso          # ou: make login-btp
+btp login                # ou: make login-btp (pede usuário e senha)
 btp --info               # "Current target" mostra o subdomínio do global account
 make discover            # subaccounts + entitlements (somente leitura)
 ```
@@ -61,9 +61,9 @@ libere estes hosts (todos em HTTPS/443):
 | `github.com`, `release-assets.githubusercontent.com`, `objects.githubusercontent.com` | Terraform, `make setup` | Baixar os binários dos providers `SAP/btp` e `cloudfoundry`, e o tflint |
 | `releases.hashicorp.com` | Terraform (opcional) | Baixar o próprio Terraform |
 | `cli.btp.cloud.sap` | btp CLI e provider BTP | API de administração do BTP (todo `plan`/`apply` do stack 10) |
-| `accounts.sap.com` | btp CLI e cf CLI | Login SSO do SAP ID service / Universal ID |
+| `accounts.sap.com` | Navegador (opcional) | Login no cockpit e fluxo SSO; o login usuário/senha da POC não depende dele |
 | `api.cf.us10-001.hana.ondemand.com` | cf CLI, provider CF | API do Cloud Foundry |
-| `login.cf.us10-001.hana.ondemand.com`, `uaa.cf.us10-001.hana.ondemand.com` | cf CLI, provider CF | Tokens OAuth do Cloud Foundry (`cf login --sso`) |
+| `login.cf.us10-001.hana.ondemand.com`, `uaa.cf.us10-001.hana.ondemand.com` | cf CLI, provider CF | Tokens OAuth do Cloud Foundry (`cf auth` e provider CF) |
 | `*.cfapps.us10-001.hana.ondemand.com` | Ansible (smoke test) | Acessar a app implantada |
 | `galaxy.ansible.com` | `make setup` | Baixar as coleções Ansible |
 | `pypi.org`, `files.pythonhosted.org` | `make setup` (uv) | Instalar ansible-core, ansible-lint, yamllint |

@@ -1,9 +1,8 @@
 # Atalhos da POC. Rode `make` (ou `make help`) para ver todos os alvos.
 #
-# Fluxo completo:
-#   make setup login-btp
+# Fluxo completo (credenciais em BTP_USERNAME / BTP_PASSWORD, veja docs/02):
+#   make setup
 #   make account-plan account-apply   # stack 10: subaccount + org CF
-#   make login-cf
 #   make space-plan space-apply       # stack 20: space + serviços
 #   make deploy                       # Ansible: app + smoke test
 #   make down                         # desfaz tudo, na ordem inversa
@@ -25,8 +24,11 @@ ANSIBLE        := cd ansible && PATH="$(BIN):$$PATH" ansible-playbook
 # Lê o subdomínio do global account do tfvars (evita digitar duas vezes).
 GLOBALACCOUNT  ?= $(shell sed -nE 's/^globalaccount *= *"([^"]+)".*/\1/p' $(ACCOUNT_STACK)/terraform.tfvars 2>/dev/null)
 
-# O provider BTP reaproveita a sessão do `btp login --sso` (funciona com Universal ID).
-export USE_BTPCLI_SESSION ?= true
+# Um único par de credenciais (BTP_USERNAME / BTP_PASSWORD) serve para tudo.
+# O provider CF lê CF_USER/CF_PASSWORD e o cf CLI lê CF_USERNAME/CF_PASSWORD;
+# o mapeamento é feito pelo SHELL (não pelo make), para que senhas com "$" não
+# sejam reinterpretadas.
+CF_ENV := CF_USER="$${CF_USER:-$$BTP_USERNAME}" CF_USERNAME="$${CF_USERNAME:-$$BTP_USERNAME}" CF_PASSWORD="$${CF_PASSWORD:-$$BTP_PASSWORD}"
 # Não consultar a HashiCorp a cada comando (checagem de versão nova).
 export CHECKPOINT_DISABLE := 1
 
@@ -49,18 +51,27 @@ setup: ## Cria .venv (Ansible, linters, tflint) e instala as coleções Ansible
 	  [ -f $$f/terraform.tfvars ] || { cp $$f/terraform.tfvars.example $$f/terraform.tfvars; echo "Criado $$f/terraform.tfvars: edite antes do plan"; }; \
 	done
 
+.PHONY: check-creds
+check-creds: ## Confere se BTP_USERNAME e BTP_PASSWORD estão exportadas
+	@[ -n "$${BTP_USERNAME:-}" ] && [ -n "$${BTP_PASSWORD:-}" ] || { \
+	  echo "Exporte as credenciais antes:"; \
+	  echo '  export BTP_USERNAME="voce@exemplo.com"'; \
+	  echo '  read -rs BTP_PASSWORD && export BTP_PASSWORD'; \
+	  exit 1; }
+
 .PHONY: login-btp
-login-btp: ## Login no BTP pelo navegador (SSO) no global account do tfvars
+login-btp: ## Login do btp CLI (pede usuário e senha) para os comandos manuais/discover
 	@[ -n "$(GLOBALACCOUNT)" ] || { echo "Defina globalaccount em $(ACCOUNT_STACK)/terraform.tfvars"; exit 1; }
-	btp login --sso --url https://cli.btp.cloud.sap --subdomain $(GLOBALACCOUNT)
+	btp login --url https://cli.btp.cloud.sap --subdomain $(GLOBALACCOUNT)
 
 .PHONY: login-cf
-login-cf: ## Login no Cloud Foundry (SSO) na org criada pelo stack 10
-	cf login --sso -a "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_api_url)" \
-	  -o "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_org_name)"
+login-cf: check-creds ## Autentica o cf CLI na org do stack 10 (para comandos manuais)
+	cf api "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_api_url)"
+	$(CF_ENV) cf auth
+	cf target -o "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_org_name)"
 
 .PHONY: discover
-discover: ## (somente leitura) Mostra subaccounts e entitlements do global account
+discover: ## (somente leitura, exige make login-btp) Subaccounts e entitlements do global account
 	btp list accounts/subaccount
 	btp list accounts/entitlement
 
@@ -71,15 +82,15 @@ account-init: ## terraform init do stack 10
 	$(TF) -chdir=$(ACCOUNT_STACK) init -input=false
 
 .PHONY: account-plan
-account-plan: account-init ## Gera o plano do stack 10 em tfplan (revise antes de aplicar!)
+account-plan: check-creds account-init ## Gera o plano do stack 10 em tfplan (revise antes de aplicar!)
 	$(TF) -chdir=$(ACCOUNT_STACK) plan -input=false -out=tfplan
 
 .PHONY: account-apply
-account-apply: ## Aplica EXATAMENTE o tfplan revisado do stack 10
+account-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 10
 	@[ -f $(ACCOUNT_STACK)/tfplan ] || { echo "Sem plano. Rode: make account-plan"; exit 1; }
 	$(TF) -chdir=$(ACCOUNT_STACK) apply -input=false tfplan
 	@rm -f $(ACCOUNT_STACK)/tfplan
-	@echo; echo "Próximo passo: make login-cf"
+	@echo; echo "Próximo passo: make space-plan"
 
 ##@ Terraform - stack 20 (space Cloud Foundry)
 
@@ -88,36 +99,36 @@ space-init: ## terraform init do stack 20
 	$(TF) -chdir=$(SPACE_STACK) init -input=false
 
 .PHONY: space-plan
-space-plan: space-init ## Gera o plano do stack 20 em tfplan
-	$(TF) -chdir=$(SPACE_STACK) plan -input=false -out=tfplan
+space-plan: check-creds space-init ## Gera o plano do stack 20 em tfplan
+	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) plan -input=false -out=tfplan
 
 .PHONY: space-apply
-space-apply: ## Aplica EXATAMENTE o tfplan revisado do stack 20
+space-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 20
 	@[ -f $(SPACE_STACK)/tfplan ] || { echo "Sem plano. Rode: make space-plan"; exit 1; }
-	$(TF) -chdir=$(SPACE_STACK) apply -input=false tfplan
+	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) apply -input=false tfplan
 	@rm -f $(SPACE_STACK)/tfplan
 
 .PHONY: drift
-drift: ## Detecta drift (mudanças feitas fora do Terraform) nos dois stacks
+drift: check-creds ## Detecta drift (mudanças feitas fora do Terraform) nos dois stacks
 	$(TF) -chdir=$(ACCOUNT_STACK) plan -refresh-only -input=false -detailed-exitcode
-	$(TF) -chdir=$(SPACE_STACK) plan -refresh-only -input=false -detailed-exitcode
+	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) plan -refresh-only -input=false -detailed-exitcode
 
 ##@ Ansible (configuração e deploy)
 
 .PHONY: deploy-check
-deploy-check: ## Dry-run: mostra o que o Ansible mudaria (--check --diff)
+deploy-check: check-creds ## Dry-run: mostra o que o Ansible mudaria (--check --diff)
 	$(ANSIBLE) playbooks/site.yml --check --diff
 
 .PHONY: deploy
-deploy: ## Deploy idempotente da app + smoke test
+deploy: check-creds ## Deploy idempotente da app + smoke test
 	$(ANSIBLE) playbooks/site.yml
 
 ##@ Desmontagem
 
 .PHONY: down
-down: ## Remove app (Ansible) e destrói stack 20 e stack 10 (pede confirmação)
+down: check-creds ## Remove app (Ansible) e destrói stack 20 e stack 10 (pede confirmação)
 	$(ANSIBLE) playbooks/teardown.yml
-	$(TF) -chdir=$(SPACE_STACK) destroy -input=false
+	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) destroy -input=false
 	$(TF) -chdir=$(ACCOUNT_STACK) destroy -input=false
 
 ##@ Qualidade (não precisam de credenciais)

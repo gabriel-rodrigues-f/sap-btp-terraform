@@ -1,14 +1,11 @@
-# O bloco fica VAZIO de propósito.
+# O endpoint vem do stack 10 (contrato via outputs); as credenciais vêm do
+# ambiente, nunca do código:
 #
-# Sem atributos e sem variáveis CF_*, o provider usa a sessão do cf CLI
-# (~/.cf/config.json): endpoint, token e refresh token. É o caminho que funciona
-# com SAP Universal ID, porque o login acontece no navegador:
+#   CF_USER / CF_PASSWORD   (o Makefile preenche a partir de BTP_USERNAME / BTP_PASSWORD)
+#   CF_ORIGIN               (opcional; só para IdP customizado)
 #
-#   cf login --sso -a <cf_api_url do stack 10>     # make login-cf faz isso
-#
-# Atenção: se você preencher só `api_url` aqui, o provider passa a EXIGIR
-# user/password ou token e ignora a sessão do CLI.
-#
-# Em pipeline, use um usuário técnico (sem Universal ID) por variáveis de ambiente:
-#   CF_API_URL, CF_USER, CF_PASSWORD [, CF_ORIGIN]
-provider "cloudfoundry" {}
+# Com api_url definido aqui, o provider NÃO usa a sessão do cf CLI
+# (~/.cf/config.json): o plan é reproduzível e independe de onde o CLI aponta.
+provider "cloudfoundry" {
+  api_url = local.account.cf_api_url
+}
