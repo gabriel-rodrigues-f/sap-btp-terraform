@@ -1,0 +1,109 @@
+# CI só com checagens ESTÁTICAS: não precisa (nem deve ter) credencial do BTP.
+# Plan/apply automatizados exigem usuário técnico sem Universal ID ou OIDC com
+# IdP customizado: veja docs/02-autenticacao.md.
+#
+# Actions fixadas por SHA (com a versão no comentário): uma tag pode ser movida
+# por quem controla o repositório da action; um SHA não.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHECKPOINT_DISABLE: "1"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read Terraform version
+        id: tfver
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.tfver.outputs.version }}
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.64.0
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive terraform
+
+      - name: terraform validate
+        run: make validate
+
+      - name: terraform test (providers mockados)
+        run: make test
+
+      - name: Lock files dos stacks estão completos
+        run: |
+          for s in terraform/stacks/*/; do
+            terraform -chdir="$s" init -backend=false -input=false -lockfile=readonly
+          done
+
+      - name: tflint
+        run: tflint --chdir=terraform --recursive --config "$PWD/terraform/.tflint.hcl"
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Trivy (misconfiguration + segredos)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Instalar toolchain fixada
+        run: |
+          uv venv --python 3.13 .venv
+          uv pip install --python .venv/bin/python -r requirements.txt
+          cd ansible && ../.venv/bin/ansible-galaxy collection install -r requirements.yml -p collections
+
+      - name: ansible-lint (perfil production)
+        working-directory: ansible
+        run: PATH="$PWD/../.venv/bin:$PATH" ansible-lint
+
+      - name: syntax-check
+        working-directory: ansible
+        run: |
+          for p in playbooks/*.yml; do ../.venv/bin/ansible-playbook "$p" --syntax-check; done
+
+      - name: yamllint
+        run: .venv/bin/yamllint -s .
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: node --check
+        run: node --check app/hello-btp/server.js

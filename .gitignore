@@ -1,0 +1,38 @@
+# --- Terraform -------------------------------------------------------------
+**/.terraform/*
+# Estado contém dados sensíveis: NUNCA versionar
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# tfvars reais têm e-mails/IDs do seu ambiente; versione só os .example
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# Lock file só é versionado em ROOT modules (stacks), não em módulos reutilizáveis
+terraform/modules/**/.terraform.lock.hcl
+
+# --- Ansible ---------------------------------------------------------------
+ansible/collections/
+*.retry
+
+# --- Python / ferramentas ------------------------------------------------------
+.venv/
+__pycache__/
+
+# --- Artefatos gerados -------------------------------------------------------
+.build/
+node_modules/
+
+# --- SO / IDE --------------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/

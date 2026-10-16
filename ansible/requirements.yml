@@ -1,0 +1,9 @@
+---
+# Versões FIXAS: o mesmo playbook precisa se comportar igual hoje e daqui a 6 meses.
+# Instalação (feita por `make setup`):
+#   ansible-galaxy collection install -r requirements.yml -p collections
+collections:
+  - name: cloud.terraform # lê outputs do Terraform (terraform_output)
+    version: "4.0.0"
+  - name: ansible.posix # callback profile_tasks
+    version: "2.2.2"

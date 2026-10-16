@@ -1,0 +1,9 @@
+---
+# Falhar CEDO e com mensagem clara é mais barato do que falhar no meio do deploy.
+
+- name: Check that required CLIs are installed
+  ansible.builtin.command:
+    argv: ["{{ item }}", "--version"]
+  loop: "{{ preflight_required_binaries }}"
+  changed_when: false
+  check_mode: false

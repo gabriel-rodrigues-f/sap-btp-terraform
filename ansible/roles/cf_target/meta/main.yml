@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: cf_target
+  author: gabriel-rodrigues-f
+  description: Autentica o cf CLI e faz target na org/space provisionados pelo Terraform.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericUNIX
+      versions: [all]
+dependencies: []

@@ -1,0 +1,25 @@
+---
+# Remove o que o ANSIBLE criou (app + rota), antes do `terraform destroy`.
+# Regra de ouro: cada ferramenta destrói o que ela mesma criou.
+
+- name: Remove the sample app from SAP BTP Cloud Foundry
+  hosts: btp_control
+  gather_facts: false
+
+  roles:
+    - role: preflight
+
+    - role: btp_context
+
+    - role: cf_target
+      vars:
+        cf_target_api_url: "{{ btp_context_info.cf_api_url }}"
+        cf_target_org: "{{ btp_context_info.cf_org_name }}"
+        cf_target_space: "{{ btp_context_info.cf_space_name }}"
+
+  tasks:
+    - name: Delete the app and its mapped routes
+      ansible.builtin.command:
+        argv: [cf, delete, "{{ app_name }}", -r, -f]
+      register: teardown_delete
+      changed_when: "'does not exist' not in teardown_delete.stdout"

@@ -1,0 +1,9 @@
+---
+# Stack Terraform cujos outputs formam o contrato com o Ansible.
+# O stack 20 repassa também o que importa do stack 10 (API, org, destinations).
+btp_context_repo_root: "{{ playbook_dir | dirname | dirname }}"
+btp_context_stack_dir: "{{ btp_context_repo_root }}/terraform/stacks/20-cf-space"
+
+# Domínio das rotas. Vazio = derivado do endpoint da API
+# (https://api.cf.us10-001.hana.ondemand.com -> cfapps.us10-001.hana.ondemand.com).
+btp_context_apps_domain: ""

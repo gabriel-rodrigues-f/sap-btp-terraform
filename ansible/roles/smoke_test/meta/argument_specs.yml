@@ -1,0 +1,21 @@
+---
+argument_specs:
+  main:
+    short_description: Verifica ponta a ponta se a app responde e enxerga a destination.
+    options:
+      smoke_test_base_url:
+        type: str
+        required: true
+        description: URL base da app (https://host.domínio).
+      smoke_test_destination_name:
+        type: str
+        required: true
+        description: Nome da destination que a app deve conseguir ler.
+      smoke_test_retries:
+        type: int
+        default: 20
+        description: Tentativas do health check.
+      smoke_test_delay:
+        type: int
+        default: 6
+        description: Segundos entre tentativas.

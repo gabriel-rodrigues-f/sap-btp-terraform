@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: preflight
+  author: gabriel-rodrigues-f
+  description: Verifica se os CLIs necessários estão instalados antes de qualquer alteração.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericUNIX
+      versions: [all]
+dependencies: []
