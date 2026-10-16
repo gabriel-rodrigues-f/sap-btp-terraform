@@ -160,10 +160,21 @@ exigiria trocar a autenticação do Terraform (veja [docs/02](02-autenticacao.md
 | Integration Suite | `Integration_Provisioner` (depois da ativação: `PI_*`, `APIPortal.*`, `AuthGroup.*`) |
 | Business Application Studio | `Business_Application_Studio_Administrator`, `_Developer`, `_Extension_Deployer` |
 | Work Zone, standard edition | `Launchpad_Admin` |
-| Build Code | `Build Code Administrator`, `Build Code Developer` |
-| HANA Cloud Tools | `SAP HANA Cloud Administrator` |
+| Build Code | `Build Code - Lobby Admin`, `Build Code - Lobby Developer` |
+| Build Apps | `BuildAppsAdmin`, `BuildAppsDeveloper` (**criadas pelo Terraform**) |
+| Process Automation | `ProcessAutomationAdmin`, `ProcessAutomationDeveloper`, `ProcessAutomationParticipant` |
+| HANA Cloud Tools | `SAP HANA Cloud Administrator`, `SAP HANA Cloud Security Administrator` |
+| CI/CD | `CICD Service Administrator`, `CICD Service Developer` |
+| Cloud Transport Management | `TMS_LandscapeOperator_RC`, `TMS_Viewer_RC` |
 | Automation Pilot | `AutomationPilot_Admin`, `AutomationPilot_Developer` |
-| Demais (Build Apps, Process Automation, CI/CD, Cloud TMS, Audit Log Viewer, Feature Flags) | Descobertas depois da assinatura com `btp list security/role-collection` e incluídas em `subscriptions` |
+| Audit Log Viewer | `Auditlog_Auditor` (**criada pelo Terraform**) |
+| Feature Flags Dashboard | `FeatureFlags_Dashboard_Administrator` (**criada pelo Terraform**) |
+
+Algumas aplicações só entregam **roles**, sem role collection. Para elas, o
+módulo `btp-apps` cria a role collection (`custom_role_collections`), juntando
+os roles pelo template e pelo prefixo do app id (o sufixo `!b107153` muda por
+landscape), e a atribui ao usuário como as demais. Os nomes reais vieram do
+primeiro apply: `Build Code Administrator`, por exemplo, não existe na trial.
 
 ## 4. Permissões (RBAC por persona)
 

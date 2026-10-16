@@ -20,6 +20,30 @@ variables {
       app_name = "feature-flags-dashboard"
       plan     = "dashboard"
     }
+    build-apps = {
+      app_name = "sap-appgyver-ee"
+      plan     = "free"
+      custom_role_collections = {
+        BuildAppsAdmin = { role_templates = ["BuildAppsAdmin"], app_prefixes = ["appgyver-xsuaa!"] }
+      }
+    }
+  }
+}
+
+# O filtro de roles por prefixo do app id depende do data source
+# btp_subaccount_roles, cujo atributo aninhado não aceita override no
+# `terraform test` (1.12); ele é validado no apply real.
+run "role_collection_customizada_planejada_e_atribuida" {
+  command = plan
+
+  assert {
+    condition     = btp_subaccount_role_collection.custom["BuildAppsAdmin"].name == "BuildAppsAdmin"
+    error_message = "A role collection customizada deve ser criada com o nome pedido."
+  }
+
+  assert {
+    condition     = contains(keys(btp_subaccount_role_collection_assignment.this), "build-apps|BuildAppsAdmin|ana@example.com")
+    error_message = "A role collection customizada também é atribuída ao usuário."
   }
 }
 
@@ -31,6 +55,7 @@ run "uma_atribuicao_por_app_role_e_usuario" {
       "bas|Business_Application_Studio_Administrator|ana@example.com",
       "bas|Business_Application_Studio_Developer|ana@example.com",
       "integration-suite|Integration_Provisioner|ana@example.com",
+      "build-apps|BuildAppsAdmin|ana@example.com",
     ])
     error_message = "Atribuições devem ser app x role collection x usuário; app sem roles não gera nada."
   }

@@ -9,12 +9,19 @@ variable "subscriptions" {
     (`btp list accounts/subscription`), que pode diferir do entitlement.
     'role_collections' são atribuídas ao usuário do IAS assim que a assinatura
     existe (as role collections só nascem com a assinatura).
+    'custom_role_collections' cria role collections para apps que só entregam
+    ROLES (ex.: Build Apps): nome => templates de role + prefixos do app id.
+    Elas também são atribuídas aos usuários.
   EOT
   type = map(object({
     app_name         = string
     plan             = string
     parameters       = optional(string)
     role_collections = optional(list(string), [])
+    custom_role_collections = optional(map(object({
+      role_templates = list(string)
+      app_prefixes   = list(string)
+    })), {})
   }))
   default = {}
 

@@ -49,6 +49,7 @@ variable "shared_services" {
   }))
   default = {
     connectivity                  = { offering = "connectivity", plan = "lite" }
+    xsuaa-api                     = { offering = "xsuaa", plan = "apiaccess", keys = ["platform-automation"] }
     html5-runtime                 = { offering = "html5-apps-repo", plan = "app-runtime", keys = ["cicd"] }
     feature-flags                 = { offering = "feature-flags", plan = "lite", keys = ["cicd"] }
     alert-notification            = { offering = "alert-notification", plan = "standard", keys = ["monitoring"] }

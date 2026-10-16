@@ -98,7 +98,7 @@ module "space" {
       plan     = si.plan
       tags     = si.tags
       keys     = si.keys
-      parameters = (si.offering == "xsuaa" && si.parameters == null
+      parameters = (si.offering == "xsuaa" && si.plan == "application" && si.parameters == null
         ? jsonencode({ xsappname = module.naming.service_instances[k], "tenant-mode" = "dedicated" })
       : si.parameters)
     }
