@@ -1,7 +1,7 @@
 #
 # Habilita o ambiente Cloud Foundry (= cria a org) num subaccount.
 # Tudo DENTRO da org (spaces, roles, serviços) é responsabilidade do provider
-# cloudfoundry, em outro stack. Veja docs/03-terraform-boas-praticas.md.
+# cloudfoundry, em outro stack. Veja docs/04-terraform-boas-praticas.md.
 #
 
 resource "btp_subaccount_environment_instance" "this" {

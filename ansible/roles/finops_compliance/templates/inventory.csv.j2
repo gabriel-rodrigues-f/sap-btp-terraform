@@ -1,0 +1,6 @@
+{% set cols = ['cost-center', 'business-unit', 'workload', 'environment', 'region', 'owner', 'service', 'plan', 'consumer'] %}
+type,name,guid,compliant,missing,{{ cols | join(',') }}
+{% for r in finops_compliance_rows | sort(attribute='type') %}
+{{ r.type }},{{ r.name }},{{ r.guid }},{{ 'yes' if r.compliant else 'no' }},{{ r.missing | join(' ') }},{% for c in cols %}{{ r.labels[c] | default('') }}{{ ',' if not loop.last else '' }}{% endfor %}
+
+{% endfor %}

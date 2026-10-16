@@ -1,0 +1,78 @@
+mock_provider "btp" {}
+
+variables {
+  subaccount_id = "00000000-0000-0000-0000-000000000000"
+  labels        = { "cost-center" = ["cc-1001"] }
+
+  subscriptions = [
+    { app_name = "feature-flags-dashboard", plan_name = "dashboard" },
+  ]
+
+  service_instances = {
+    audit = {
+      name     = "audit-application-integration-qa-us10-001"
+      offering = "auditlog-management"
+      plan     = "default"
+      keys     = ["siem", "cicd"]
+    }
+    sm = {
+      name     = "sm-application-integration-qa-us10-001"
+      offering = "service-manager"
+      plan     = "subaccount-audit"
+    }
+  }
+}
+
+run "instancias_com_labels_de_servico_e_plano" {
+  command = plan
+
+  assert {
+    condition     = btp_subaccount_service_instance.this["audit"].labels["service"] == toset(["auditlog-management"])
+    error_message = "Instância deve carregar a label service (custo por serviço)."
+  }
+
+  assert {
+    condition     = btp_subaccount_service_instance.this["audit"].labels["plan"] == toset(["default"]) && btp_subaccount_service_instance.this["audit"].labels["cost-center"] == toset(["cc-1001"])
+    error_message = "Instância deve somar plan às labels de FinOps."
+  }
+}
+
+run "uma_service_key_por_consumidor" {
+  command = plan
+
+  assert {
+    condition     = toset(keys(btp_subaccount_service_binding.this)) == toset(["audit/siem", "audit/cicd"])
+    error_message = "Uma key por instância/consumidor; instâncias sem keys não geram binding."
+  }
+
+  assert {
+    condition     = btp_subaccount_service_binding.this["audit/siem"].name == "sk-siem"
+    error_message = "Nome da key deve ser sk-<consumidor>."
+  }
+
+  assert {
+    condition     = btp_subaccount_service_binding.this["audit/cicd"].labels["consumer"] == toset(["cicd"])
+    error_message = "A key deve identificar o consumidor por label."
+  }
+}
+
+run "assinatura_indexada_por_app_e_plano" {
+  command = plan
+
+  assert {
+    condition     = contains(keys(btp_subaccount_subscription.this), "feature-flags-dashboard/dashboard")
+    error_message = "Assinatura indexada por app/plan."
+  }
+}
+
+run "rejeita_consumidor_fora_do_padrao" {
+  command = plan
+
+  variables {
+    service_instances = {
+      audit = { name = "x", offering = "auditlog-management", plan = "default", keys = ["Time de Integração"] }
+    }
+  }
+
+  expect_failures = [var.service_instances]
+}

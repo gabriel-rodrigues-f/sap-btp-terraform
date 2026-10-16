@@ -1,109 +1,100 @@
 # SAP BTP com Terraform + Ansible
 
-Exemplo didático, pronto para rodar numa conta **trial** do SAP BTP, que mostra
-como dividir o trabalho entre as duas ferramentas:
+Exemplo didático, pronto para rodar numa conta **trial** do SAP BTP, de como
+montar uma *landing zone* com governança desde o primeiro recurso:
 
-- **Terraform** cria a plataforma (subaccount, entitlements, destination, org e
-  space Cloud Foundry, instâncias de serviço).
-- **Ansible** configura e implanta o que roda nela (deploy idempotente de uma app
-  e um smoke test ponta a ponta).
+- **Convenção de nomes** no estilo Azure CAF: `application-integration-qa-us10`
+- **Labels de FinOps** em directory, subaccount, instâncias, service keys, org e spaces
+- **Permissões por persona** no directory, no subaccount, na org e no space do Cloud Foundry
+- **Serviços nos dois modelos**: instâncias no Cloud Foundry e no nível do
+  subaccount (Service Manager), assinaturas SaaS e uma service key por consumidor
 
-No fim, uma app Node.js no Cloud Foundry lê uma *destination* que o Terraform
-criou, o que comprova que as duas camadas estão ligadas.
+O **Terraform** cria tudo isso. O **Ansible** cobre o que o Terraform não alcança
+(labels na org, que é criada pelo BTP) e audita o ambiente real contra a
+política de labels.
 
-## Arquitetura
+## O que é criado
 
 ```mermaid
-flowchart LR
-  subgraph TF["Terraform (infraestrutura)"]
-    S10["stack 10-btp-subaccount<br/>provider SAP/btp"]
-    S20["stack 20-cf-space<br/>provider cloudfoundry"]
+flowchart TB
+  GA["Global account (trial)"]
+  subgraph DIR["Directory corporate-it  ·  labels: cost-center, business-unit, owner…"]
+    subgraph SA["Subaccount application-integration-qa-us10"]
+      SUB["Assinaturas SaaS<br/>feature-flags-dashboard · auditlog-viewer · automationpilot"]
+      SM["Instâncias no subaccount + keys<br/>audit-…-001 (sk-siem) · sm-…-001 (sk-finops-reporting)"]
+      subgraph ORG["Org CF application-integration-qa-us10-203d9eeb"]
+        subgraph SP["Space integration"]
+          CFI["7 instâncias: dest · uaa · conn · ff · ans · html5 · log<br/>6 service keys: sk-cicd · sk-integration-suite · sk-monitoring"]
+        end
+      end
+    end
   end
-  subgraph AN["Ansible (configuração e deploy)"]
-    CTX["btp_context<br/>lê outputs"]
-    APP["cf_app<br/>cf push idempotente"]
-    SMK["smoke_test"]
-  end
-  subgraph BTP["SAP BTP trial (us10)"]
-    SA["Subaccount<br/>entitlements + destination northwind"]
-    ORG["Org Cloud Foundry"]
-    SP["Space dev<br/>serviço destination"]
-    HB["App hello-btp"]
-  end
-
-  S10 -->|cria| SA
-  S10 -->|cria| ORG
-  S10 -. "outputs (remote state)" .-> S20
-  S20 -->|cria| SP
-  S20 -. "outputs (terraform output)" .-> CTX
-  CTX --> APP -->|deploy| HB
-  APP --> SMK -->|"GET /destination"| HB
-  HB -->|lê| SA
+  GA --> DIR
+  TF10["Terraform stack 10<br/>(provider SAP/btp)"] -.-> DIR
+  TF20["Terraform stack 20<br/>(provider cloudfoundry)"] -.-> SP
+  ANS["Ansible<br/>labels na org + auditoria FinOps"] -.-> ORG
 ```
 
-### Quem faz o quê, e por quê
-
-| Responsabilidade | Ferramenta | Motivo |
+| Camada | Ferramenta | Cria/gerencia |
 | --- | --- | --- |
-| Subaccount, entitlements, role collections, destination | Terraform (`SAP/btp`) | Recursos declarativos, com estado, plan e detecção de drift |
-| Org Cloud Foundry (ambiente) | Terraform (`SAP/btp`) | É um recurso do BTP, não do Cloud Foundry |
-| Space, papéis, instâncias de serviço | Terraform (`cloudfoundry/cloudfoundry`) | Ainda é plataforma; tem provider oficial |
-| Deploy da app, variáveis, rotas | Ansible | Muda a cada release, envolve build e ordem de passos |
-| Smoke test pós-deploy | Ansible | Verificação procedural, sem estado a guardar |
+| Stack `10-btp-account` | Terraform `SAP/btp` | Directory (cota + permissões), subaccount, entitlements, role collections, assinaturas, instâncias e keys no subaccount, ambiente CF (org) |
+| Stack `20-cloudfoundry` | Terraform `cloudfoundry/cloudfoundry` | Papéis na org, spaces, papéis nos spaces, instâncias e service keys no CF |
+| `playbooks/site.yml` | Ansible | Labels e annotations na org; auditoria de labels com inventário CSV |
 
-A regra usada: **o que tem ciclo de vida de infraestrutura e provider declarativo
-vai para o Terraform; o que é procedural ou muda a cada release vai para o Ansible.**
-As camadas se comunicam só por *outputs*, que funcionam como contrato entre elas.
-Os detalhes estão em [docs/03](docs/03-terraform-boas-praticas.md) e [docs/04](docs/04-ansible-boas-praticas.md).
+As camadas se falam só por **outputs** (o contrato entre elas). Detalhes em
+[docs/03 (governança)](docs/03-governanca.md), [docs/04 (Terraform)](docs/04-terraform-boas-praticas.md)
+e [docs/05 (Ansible)](docs/05-ansible-boas-praticas.md).
 
 ## Estrutura
 
 ```text
 .
-├── Makefile                     # todos os comandos do dia a dia (make help)
+├── Makefile                      # todos os comandos do dia a dia (make help)
 ├── terraform/
-│   ├── modules/                 # blocos reutilizáveis, testados com providers mockados
-│   │   ├── btp-subaccount/      # subaccount + entitlements + destinations + admins
-│   │   ├── btp-cloudfoundry/    # ambiente CF (org) e extração do endpoint da API
-│   │   └── cf-space/            # space + papéis + instâncias de serviço
-│   └── stacks/                  # root modules: um estado por camada
-│       ├── 10-btp-subaccount/   # provider SAP/btp
-│       └── 20-cf-space/         # provider cloudfoundry (lê outputs do 10)
+│   ├── modules/                  # blocos reutilizáveis, cada um com testes (terraform test)
+│   │   ├── naming/               # convenção de nomes (módulo puro, sem provider)
+│   │   ├── finops-labels/        # taxonomia de labels nos formatos BTP e CF (módulo puro)
+│   │   ├── btp-directory/        # directory + cota + Directory Admin/Viewer
+│   │   ├── btp-subaccount/       # subaccount + entitlements + role collections
+│   │   ├── btp-services/         # assinaturas, instâncias e service keys no subaccount
+│   │   ├── btp-cloudfoundry/     # ambiente CF (org) e endpoint da API
+│   │   ├── cf-org-access/        # papéis na org (membros primeiro)
+│   │   └── cf-space/             # space + papéis + instâncias + service keys
+│   └── stacks/                   # root modules: um estado por camada
+│       ├── 10-btp-account/
+│       └── 20-cloudfoundry/
 ├── ansible/
-│   ├── playbooks/site.yml       # preflight -> contexto -> target -> deploy -> smoke test
-│   ├── playbooks/teardown.yml   # remove o que o Ansible criou
-│   └── roles/                   # preflight, btp_context, cf_target, cf_app, smoke_test
-├── app/hello-btp/               # app Node.js sem dependências
-├── scripts/install-tflint.sh    # instala tflint fixado, com verificação de checksum
-├── docs/                        # guias (pré-requisitos, autenticação, boas práticas...)
-└── .github/workflows/ci.yml     # fmt, validate, test, tflint, ansible-lint, trivy
+│   ├── playbooks/site.yml        # preflight -> contexto -> login CF -> labels na org -> auditoria
+│   └── roles/                    # preflight, btp_context, cf_target, cf_org_metadata, finops_compliance
+├── docs/                         # guias (trial, autenticação, governança, boas práticas...)
+└── .github/workflows/ci.yml      # fmt, validate, test, tflint, ansible-lint, trivy
 ```
 
 ## Pré-requisitos
 
 - Conta trial do SAP BTP: <https://account.hanatrial.ondemand.com>
-- `terraform` 1.9 ou superior, `btp` CLI, `cf` CLI v8, `uv`, `node` 22 (opcional, para rodar a app localmente)
-- **1 GB de memória Cloud Foundry livre** no global account. Na trial, toda a cota
-  vem atribuída ao subaccount `trial`, então é preciso liberar 1 GB antes
-  ([como fazer](docs/01-pre-requisitos-trial.md#liberar-memória-cloud-foundry)).
-- Acesso de rede aos hosts listados em [docs/01](docs/01-pre-requisitos-trial.md#hosts-que-precisam-estar-liberados).
+- `terraform` 1.9 ou superior, `btp` CLI, `cf` CLI v8, `uv`
+- Acesso de rede aos hosts de [docs/01](docs/01-pre-requisitos-trial.md#hosts-que-precisam-estar-liberados)
 
 ```bash
 brew install hashicorp/tap/terraform cloudfoundry/tap/cf-cli@8 uv
 brew install --cask btp            # ou baixe em https://tools.hana.ondemand.com/#cloud-btpcli
 ```
 
+Não é preciso liberar memória do Cloud Foundry: não há apps. Todos os planos
+usados são ELASTIC/APPLICATION da trial, sem cota numérica.
+
 ## Passo a passo
 
 ```bash
-make setup                       # .venv com Ansible e linters, tflint e coleções; cria os terraform.tfvars
+make setup     # .venv com Ansible e linters, tflint, coleções; cria os terraform.tfvars
 ```
 
-Edite `terraform/stacks/10-btp-subaccount/terraform.tfvars` e informe `globalaccount`
-(o subdomínio, visível em `btp --info`) e `admins` (seu e-mail).
+Edite `terraform/stacks/10-btp-account/terraform.tfvars`: `globalaccount`
+(subdomínio, veja `btp --info`), nomes, `finops` e `access`.
 
-Exporte as credenciais (usuário e senha do SAP ID service) no terminal.
-A senha nunca vai para arquivo ([detalhes](docs/02-autenticacao.md)):
+Exporte as credenciais (usuário e senha do SAP ID service). A senha nunca vai
+para arquivo ([detalhes](docs/02-autenticacao.md)):
 
 ```bash
 export BTP_USERNAME="voce@exemplo.com"
@@ -111,27 +102,22 @@ read -rs BTP_PASSWORD && export BTP_PASSWORD   # digitação oculta
 ```
 
 ```bash
-make login-btp discover          # (opcional) confira subaccounts e entitlements livres
-make account-plan                # revise o plano
-make account-apply               # cria subaccount, entitlements, destination e org CF
-make space-plan
-make space-apply                 # cria space, papéis e o serviço destination
-make deploy-check                # dry-run do Ansible
-make deploy                      # deploy + smoke test
+make account-plan      # revise: directory, subaccount, entitlements, papéis, serviços, org
+make account-apply
+make cf-plan           # revise: papéis de org e space, instâncias, service keys
+make cf-apply
+make configure-check   # dry-run do Ansible
+make configure         # labels na org + auditoria (gera .build/finops/cf-inventory.csv)
 ```
 
-O último passo termina com algo como:
+O resultado da auditoria termina assim:
 
 ```text
-TASK [smoke_test : Ensure the app resolved the destination created by Terraform]
-ok: [localhost] => OK: northwind -> https://services.odata.org/V4/Northwind/Northwind.svc
+TASK [finops_compliance : Show the compliance summary]
+ok: [localhost] => msg: 15 recursos auditados, 0 sem labels obrigatórias.
 ```
 
-Rode `make deploy` de novo: o Ansible detecta que nada mudou e **não** refaz o
-push (`changed=0`). Altere `app/hello-btp/server.js` e rode outra vez: só então
-acontece um deploy *rolling*, sem downtime.
-
-Para desmontar, na ordem inversa:
+Para desmontar (stack 20 e depois stack 10):
 
 ```bash
 make down
@@ -148,7 +134,7 @@ make check                       # lint + validate + test (o mesmo que o CI)
 
 | Ferramenta | O que garante |
 | --- | --- |
-| `terraform test` + `mock_provider` | Lógica dos módulos (chaves de `for_each`, validações, parsing) sem tocar no BTP |
+| `terraform test` + `mock_provider` | 31 testes da lógica dos módulos (nomes, labels, RBAC, chaves de `for_each`) sem tocar no BTP |
 | `tflint` (preset `all`) | Variáveis tipadas e documentadas, versões declaradas, nada sem uso |
 | `ansible-lint` (perfil `production`) | FQCN, `changed_when`, prefixo de variáveis por role, permissões |
 | `trivy config` | Misconfiguração e segredos versionados |
@@ -158,9 +144,10 @@ make check                       # lint + validate + test (o mesmo que o CI)
 
 1. [Pré-requisitos da conta trial e rede](docs/01-pre-requisitos-trial.md)
 2. [Autenticação: usuário/senha, alternativas e CI/CD](docs/02-autenticacao.md)
-3. [Boas práticas de Terraform aplicadas aqui](docs/03-terraform-boas-praticas.md)
-4. [Boas práticas de Ansible aplicadas aqui](docs/04-ansible-boas-praticas.md)
-5. [Troubleshooting](docs/05-troubleshooting.md)
+3. [Governança: nomes, labels de FinOps e permissões](docs/03-governanca.md)
+4. [Boas práticas de Terraform aplicadas aqui](docs/04-terraform-boas-praticas.md)
+5. [Boas práticas de Ansible aplicadas aqui](docs/05-ansible-boas-praticas.md)
+6. [Troubleshooting](docs/06-troubleshooting.md)
 
 ## O que mudou em relação à versão anterior
 
@@ -169,12 +156,12 @@ A primeira versão deste repositório tinha os módulos `0-directories` a
 
 | Antes | Problema | Agora |
 | --- | --- | --- |
-| `created_at = [timestamp()]` nas labels | `timestamp()` muda a cada execução, então todo `plan` mostrava alteração (drift falso) | Labels estáveis (`managed-by`, `project`, `stage`) |
+| Nomes fixos (`APP_DEV_RPA`, `app-dev-rpa`) | Sem padrão, sem região, colisão de subdomínio entre clientes | Módulo `naming` (CAF) com sufixo único e estável |
+| `created_at = [timestamp()]` nas labels | `timestamp()` muda a cada execução: todo `plan` mostrava alteração (drift falso) | Taxonomia de FinOps estável num módulo único |
 | Providers BTP e CF no mesmo root module | O provider CF precisa do endpoint de uma org que ainda não existe no primeiro `plan` | Dois stacks, ligados por outputs |
 | `SAP/cloudfoundry` `1.0.0-rc1` | Release candidate de um nome de provider abandonado | `cloudfoundry/cloudfoundry ~> 1.18` (oficial) |
 | Versões exatas em todos os módulos (`= 1.10.0`) | Módulos travavam upgrades; o root não tinha lock file | Módulos com `>=`, stacks com `~>` e `.terraform.lock.hcl` versionado |
 | `depends_on` entre módulos | Adia todos os data sources para o apply e esconde a dependência real | Dependência propagada pelo próprio output (`depends_on` no output) |
-| Variáveis sem tipo, recebendo o objeto inteiro (`var.subaccount.id`) | Acoplamento e erros só em tempo de apply | Tipos explícitos, `validation` e só os IDs necessários |
-| Senha do CF como variável Terraform | Segredo em tfvars, histórico do shell e possivelmente no estado | Credenciais só por variáveis de ambiente, lidas direto pelos providers e pelo `cf auth` |
-| Recursos em `resource "x" "app_dev_rpa"` fixos | Para cada item novo, era preciso copiar e colar | `for_each` com chaves estáveis a partir de listas e mapas |
+| Um único admin, papel por papel | Sem modelo de acesso | Personas aplicadas em directory, subaccount, org e space |
+| Senha do CF como variável Terraform | Segredo em tfvars, no histórico do shell e possivelmente no estado | Credenciais só por variáveis de ambiente |
 | Sem testes, sem lint, sem CI | — | `terraform test`, tflint, ansible-lint, trivy, pre-commit e GitHub Actions |

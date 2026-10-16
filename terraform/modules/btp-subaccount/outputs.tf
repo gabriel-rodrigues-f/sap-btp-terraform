@@ -28,15 +28,5 @@ output "region" {
 
 output "entitlements" {
   description = "Entitlements aplicados, indexados por service/plan."
-  value       = { for k, e in btp_subaccount_entitlement.this : k => e.amount }
-}
-
-output "subscriptions" {
-  description = "URL de cada assinatura SaaS, indexada por app/plan."
-  value       = { for k, s in btp_subaccount_subscription.this : k => s.subscription_url }
-}
-
-output "destinations" {
-  description = "Nomes das destinations criadas no nível do subaccount."
-  value       = keys(btp_subaccount_destination_generic.this)
+  value       = keys(btp_subaccount_entitlement.this)
 }

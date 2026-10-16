@@ -2,7 +2,7 @@
 # Ponte Terraform -> Ansible: lê os OUTPUTS do Terraform (nunca o tfstate
 # direto) e publica um único fato, btp_context_info, para as próximas roles.
 
-- name: Read the outputs of the Cloud Foundry space stack
+- name: Read the outputs of the Cloud Foundry stack
   cloud.terraform.terraform_output:
     project_path: "{{ btp_context_stack_dir }}"
   register: btp_context_outputs
@@ -11,11 +11,11 @@
 - name: Ensure the Terraform stacks have been applied
   ansible.builtin.assert:
     that:
-      - btp_context_outputs.outputs.cf_space_id is defined
-      - btp_context_outputs.outputs.cf_api_url.value | length > 0
+      - btp_context_outputs.outputs.cf_org_id is defined
+      - btp_context_outputs.outputs.spaces is defined
     fail_msg: >-
       Não há outputs em {{ btp_context_stack_dir }}.
-      Aplique a infraestrutura antes: make account-apply && make space-apply
+      Aplique a infraestrutura antes: make account-apply && make cf-apply
     quiet: true
 
 - name: Publish the BTP context for the next roles
@@ -24,19 +24,15 @@
   ansible.builtin.set_fact:
     btp_context_info:
       cf_api_url: "{{ btp_context_out.cf_api_url.value }}"
+      cf_org_id: "{{ btp_context_out.cf_org_id.value }}"
       cf_org_name: "{{ btp_context_out.cf_org_name.value }}"
-      cf_space_name: "{{ btp_context_out.cf_space_name.value }}"
-      cf_space_id: "{{ btp_context_out.cf_space_id.value }}"
-      cf_apps_domain: >-
-        {{ btp_context_apps_domain
-           if btp_context_apps_domain | length > 0
-           else btp_context_out.cf_api_url.value | regex_replace('^https://api\.cf\.', 'cfapps.') }}
-      service_instances: "{{ btp_context_out.service_instances.value }}"
-      destinations: "{{ btp_context_out.destinations.value }}"
+      cf_org_metadata: "{{ btp_context_out.cf_org_metadata.value }}"
+      required_label_keys: "{{ btp_context_out.required_label_keys.value }}"
+      spaces: "{{ btp_context_out.spaces.value }}"
 
 - name: Show the target environment
   ansible.builtin.debug:
     msg: >-
-      Org {{ btp_context_info.cf_org_name }} / space {{ btp_context_info.cf_space_name }}
-      | serviços: {{ btp_context_info.service_instances | list | join(', ') }}
-      | destinations: {{ btp_context_info.destinations | join(', ') }}
+      Org {{ btp_context_info.cf_org_name }}
+      | spaces: {{ btp_context_info.spaces | list | join(', ') }}
+      | labels obrigatórias: {{ btp_context_info.required_label_keys | join(', ') }}

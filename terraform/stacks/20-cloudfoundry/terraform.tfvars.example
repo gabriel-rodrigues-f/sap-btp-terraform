@@ -1,0 +1,15 @@
+# Opcional: os padrões já criam o space "integration" com 7 instâncias e 6 service keys.
+# Copie para terraform.tfvars se quiser mudar.
+
+# spaces = {
+#   integration = {
+#     service_instances = {
+#       destination = { offering = "destination", plan = "lite", keys = ["cicd"] }
+#     }
+#   }
+#   monitoring = {
+#     service_instances = {
+#       alert-notification = { offering = "alert-notification", plan = "standard", keys = ["pagerduty"] }
+#     }
+#   }
+# }

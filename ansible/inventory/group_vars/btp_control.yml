@@ -1,16 +1,11 @@
 ---
-# Parâmetros do AMBIENTE (o que muda entre dev/qas/prd).
-# Defaults técnicos ficam em roles/<role>/defaults/main.yml.
-# O "onde" (org, space, serviços) NÃO fica aqui: vem dos outputs do Terraform.
+# Parâmetros do AMBIENTE. O "onde" (org, spaces, serviços) e o "como rotular"
+# (labels de FinOps) NÃO ficam aqui: vêm dos outputs do Terraform.
 
-app_name: hello-btp
-app_memory: 128M
-app_instances: 1
-
-# Destination criada pelo Terraform (stack 10) que a app vai ler.
-app_destination_name: northwind
+# Auditoria de FinOps: falhar o playbook se algum recurso estiver sem label obrigatória.
+finops_compliance_enforce: true
 
 # Credenciais: SEMPRE do ambiente, as mesmas usadas pelo Terraform.
-# Nunca escreva usuário/senha aqui (nem com ansible-vault, numa POC local).
+# Nunca escreva usuário/senha aqui.
 cf_target_username: "{{ lookup('ansible.builtin.env', 'BTP_USERNAME', default='') }}"
 cf_target_password: "{{ lookup('ansible.builtin.env', 'BTP_PASSWORD', default='') }}"

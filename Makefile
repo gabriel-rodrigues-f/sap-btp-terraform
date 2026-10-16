@@ -2,9 +2,9 @@
 #
 # Fluxo completo (credenciais em BTP_USERNAME / BTP_PASSWORD, veja docs/02):
 #   make setup
-#   make account-plan account-apply   # stack 10: subaccount + org CF
-#   make space-plan space-apply       # stack 20: space + serviços
-#   make deploy                       # Ansible: app + smoke test
+#   make account-plan account-apply   # stack 10: directory, subaccount, serviços, org CF
+#   make cf-plan cf-apply             # stack 20: papéis de org, spaces, instâncias, keys
+#   make configure                    # Ansible: labels na org + auditoria de FinOps
 #   make down                         # desfaz tudo, na ordem inversa
 
 SHELL := /bin/bash
@@ -16,8 +16,8 @@ TF             ?= terraform
 TFLINT_VERSION := 0.64.0
 VENV           := .venv
 BIN            := $(CURDIR)/$(VENV)/bin
-ACCOUNT_STACK  := terraform/stacks/10-btp-subaccount
-SPACE_STACK    := terraform/stacks/20-cf-space
+ACCOUNT_STACK  := terraform/stacks/10-btp-account
+CF_STACK       := terraform/stacks/20-cloudfoundry
 MODULES        := $(wildcard terraform/modules/*)
 ANSIBLE        := cd ansible && PATH="$(BIN):$$PATH" ansible-playbook
 
@@ -47,7 +47,7 @@ setup: ## Cria .venv (Ansible, linters, tflint) e instala as coleções Ansible
 	uv pip install --python $(BIN)/python -r requirements.txt
 	scripts/install-tflint.sh $(TFLINT_VERSION) $(BIN)
 	cd ansible && $(BIN)/ansible-galaxy collection install -r requirements.yml -p collections
-	@for f in $(ACCOUNT_STACK) $(SPACE_STACK); do \
+	@for f in $(ACCOUNT_STACK) $(CF_STACK); do \
 	  [ -f $$f/terraform.tfvars ] || { cp $$f/terraform.tfvars.example $$f/terraform.tfvars; echo "Criado $$f/terraform.tfvars: edite antes do plan"; }; \
 	done
 
@@ -65,7 +65,7 @@ login-btp: ## Login do btp CLI (pede usuário e senha) para os comandos manuais/
 	btp login --url https://cli.btp.cloud.sap --subdomain $(GLOBALACCOUNT)
 
 .PHONY: login-cf
-login-cf: check-creds ## Autentica o cf CLI na org do stack 10 (para comandos manuais)
+login-cf: check-creds ## Autentica o cf CLI na org criada pelo stack 10 (para comandos manuais)
 	cf api "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_api_url)"
 	$(CF_ENV) cf auth
 	cf target -o "$$($(TF) -chdir=$(ACCOUNT_STACK) output -raw cf_org_name)"
@@ -90,45 +90,45 @@ account-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 10
 	@[ -f $(ACCOUNT_STACK)/tfplan ] || { echo "Sem plano. Rode: make account-plan"; exit 1; }
 	$(TF) -chdir=$(ACCOUNT_STACK) apply -input=false tfplan
 	@rm -f $(ACCOUNT_STACK)/tfplan
-	@echo; echo "Próximo passo: make space-plan"
+	@echo; echo "Próximo passo: make cf-plan"
 
-##@ Terraform - stack 20 (space Cloud Foundry)
+##@ Terraform - stack 20 (Cloud Foundry: papéis, spaces, serviços)
 
-.PHONY: space-init
-space-init: ## terraform init do stack 20
-	$(TF) -chdir=$(SPACE_STACK) init -input=false
+.PHONY: cf-init
+cf-init: ## terraform init do stack 20
+	$(TF) -chdir=$(CF_STACK) init -input=false
 
-.PHONY: space-plan
-space-plan: check-creds space-init ## Gera o plano do stack 20 em tfplan
-	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) plan -input=false -out=tfplan
+.PHONY: cf-plan
+cf-plan: check-creds cf-init ## Gera o plano do stack 20 em tfplan
+	$(CF_ENV) $(TF) -chdir=$(CF_STACK) plan -input=false -out=tfplan
 
-.PHONY: space-apply
-space-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 20
-	@[ -f $(SPACE_STACK)/tfplan ] || { echo "Sem plano. Rode: make space-plan"; exit 1; }
-	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) apply -input=false tfplan
-	@rm -f $(SPACE_STACK)/tfplan
+.PHONY: cf-apply
+cf-apply: check-creds ## Aplica EXATAMENTE o tfplan revisado do stack 20
+	@[ -f $(CF_STACK)/tfplan ] || { echo "Sem plano. Rode: make cf-plan"; exit 1; }
+	$(CF_ENV) $(TF) -chdir=$(CF_STACK) apply -input=false tfplan
+	@rm -f $(CF_STACK)/tfplan
+	@echo; echo "Próximo passo: make configure"
 
 .PHONY: drift
 drift: check-creds ## Detecta drift (mudanças feitas fora do Terraform) nos dois stacks
 	$(TF) -chdir=$(ACCOUNT_STACK) plan -refresh-only -input=false -detailed-exitcode
-	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) plan -refresh-only -input=false -detailed-exitcode
+	$(CF_ENV) $(TF) -chdir=$(CF_STACK) plan -refresh-only -input=false -detailed-exitcode
 
-##@ Ansible (configuração e deploy)
+##@ Ansible (configuração e governança)
 
-.PHONY: deploy-check
-deploy-check: check-creds ## Dry-run: mostra o que o Ansible mudaria (--check --diff)
+.PHONY: configure-check
+configure-check: check-creds ## Dry-run: mostra o que o Ansible mudaria (--check --diff)
 	$(ANSIBLE) playbooks/site.yml --check --diff
 
-.PHONY: deploy
-deploy: check-creds ## Deploy idempotente da app + smoke test
+.PHONY: configure
+configure: check-creds ## Labels na org + auditoria de FinOps (relatório em .build/finops/)
 	$(ANSIBLE) playbooks/site.yml
 
 ##@ Desmontagem
 
 .PHONY: down
-down: check-creds ## Remove app (Ansible) e destrói stack 20 e stack 10 (pede confirmação)
-	$(ANSIBLE) playbooks/teardown.yml
-	$(CF_ENV) $(TF) -chdir=$(SPACE_STACK) destroy -input=false
+down: check-creds ## Destrói stack 20 e depois stack 10 (pede confirmação em cada um)
+	$(CF_ENV) $(TF) -chdir=$(CF_STACK) destroy -input=false
 	$(TF) -chdir=$(ACCOUNT_STACK) destroy -input=false
 
 ##@ Qualidade (não precisam de credenciais)
@@ -139,7 +139,7 @@ fmt: ## Formata o código Terraform
 
 .PHONY: validate
 validate: ## terraform validate em módulos e stacks (sem backend)
-	@for d in $(MODULES) $(ACCOUNT_STACK) $(SPACE_STACK); do \
+	@for d in $(MODULES) $(ACCOUNT_STACK) $(CF_STACK); do \
 	  echo "==> $$d"; \
 	  $(TF) -chdir=$$d init -backend=false -input=false >/dev/null; \
 	  $(TF) -chdir=$$d validate; \
@@ -154,12 +154,11 @@ test: ## Testes unitários dos módulos com providers mockados (terraform test)
 	done
 
 .PHONY: lint
-lint: ## fmt -check, tflint, ansible-lint, yamllint e checagem da app
+lint: ## fmt -check, tflint, ansible-lint e yamllint
 	$(TF) fmt -check -recursive terraform
 	$(BIN)/tflint --chdir=terraform --recursive --config "$(CURDIR)/terraform/.tflint.hcl"
 	cd ansible && PATH="$(BIN):$$PATH" ansible-lint
 	$(BIN)/yamllint -s .
-	node --check app/hello-btp/server.js
 
 .PHONY: check
 check: lint validate test ## Tudo o que o CI roda

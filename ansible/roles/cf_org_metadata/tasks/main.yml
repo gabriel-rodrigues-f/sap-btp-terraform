@@ -1,0 +1,37 @@
+---
+# A org Cloud Foundry é criada pelo BTP (instância de ambiente), não pelo
+# provider cloudfoundry. Por isso o Terraform não consegue rotulá-la sem
+# "roubar" a posse do recurso. O Ansible preenche essa lacuna de forma
+# idempotente: lê os metadados atuais e só faz PATCH quando algo difere.
+
+- name: Read the current metadata of the org
+  ansible.builtin.command:
+    argv: [cf, curl, "/v3/organizations/{{ cf_org_metadata_org_id }}"]
+  register: cf_org_metadata_current
+  changed_when: false
+  check_mode: false
+
+- name: Compare current and desired metadata
+  vars:
+    cf_org_metadata_now: "{{ (cf_org_metadata_current.stdout | from_json).metadata }}"
+  ansible.builtin.set_fact:
+    cf_org_metadata_drift: >-
+      {{ (cf_org_metadata_now.labels | combine(cf_org_metadata_labels)) != cf_org_metadata_now.labels
+         or (cf_org_metadata_now.annotations | combine(cf_org_metadata_annotations)) != cf_org_metadata_now.annotations }}
+
+- name: Apply FinOps labels and annotations to the org
+  ansible.builtin.command:
+    argv:
+      - cf
+      - curl
+      - -X
+      - PATCH
+      - "/v3/organizations/{{ cf_org_metadata_org_id }}"
+      - -d
+      - "{{ {'metadata': {'labels': cf_org_metadata_labels, 'annotations': cf_org_metadata_annotations}} | to_json }}"
+  register: cf_org_metadata_patch
+  when: cf_org_metadata_drift | bool
+  changed_when: true
+  failed_when: >-
+    cf_org_metadata_patch.rc != 0
+    or (cf_org_metadata_patch.stdout | from_json).errors is defined

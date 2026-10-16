@@ -14,8 +14,8 @@ argument_specs:
         description: Nome da org.
       cf_target_space:
         type: str
-        required: true
-        description: Nome do space.
+        default: ""
+        description: Nome do space (opcional; vazio = só a org).
       cf_target_username:
         type: str
         required: true

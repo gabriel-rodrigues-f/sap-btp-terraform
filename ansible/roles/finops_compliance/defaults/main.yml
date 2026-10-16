@@ -1,0 +1,6 @@
+---
+# Onde o relatório é gravado (fora do git).
+finops_compliance_report_dir: "{{ playbook_dir | dirname | dirname }}/.build/finops"
+
+# true = o playbook falha se algum recurso estiver sem label obrigatória.
+finops_compliance_enforce: true

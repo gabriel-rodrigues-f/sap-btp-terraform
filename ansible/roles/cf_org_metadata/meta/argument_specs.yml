@@ -1,0 +1,17 @@
+---
+argument_specs:
+  main:
+    short_description: Aplica labels e annotations de FinOps na org Cloud Foundry.
+    options:
+      cf_org_metadata_org_id:
+        type: str
+        required: true
+        description: GUID da org (output do Terraform).
+      cf_org_metadata_labels:
+        type: dict
+        required: true
+        description: Labels desejadas (map de string).
+      cf_org_metadata_annotations:
+        type: dict
+        default: {}
+        description: Annotations desejadas (e-mail, URL).

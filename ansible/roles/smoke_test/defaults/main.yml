@@ -1,4 +1,0 @@
----
-# Tentativas x intervalo: o primeiro deploy (staging do buildpack) leva ~1-2 min.
-smoke_test_retries: 20
-smoke_test_delay: 6

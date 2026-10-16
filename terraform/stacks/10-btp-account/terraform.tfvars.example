@@ -1,0 +1,30 @@
+# Copie para terraform.tfvars (ignorado pelo git) e ajuste:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Descubra o subdomínio do global account com:  btp --info   (linha "Current target")
+
+globalaccount = "SEU-SUBDOMINIO-trial-ga"
+
+# Convenção de nomes -> directory "corporate-it", subaccount "application-integration-qa-us10"
+business_unit = "corporate-it"
+workload      = "application-integration"
+environment   = "qa"
+region        = "us10"
+
+finops = {
+  cost_center         = "cc-1001"
+  owner               = "platform-team"
+  owner_contact       = "voce@exemplo.com"
+  criticality         = "medium"
+  data_classification = "internal"
+  # extra = { project = "s4-migration" }
+}
+
+# Personas. Atenção: papéis no Cloud Foundry só funcionam para usuários que já
+# fizeram login no CF desta região ao menos uma vez (precisam existir no UAA).
+access = {
+  platform_admins = ["voce@exemplo.com"]
+  # developers    = ["dev@exemplo.com"]
+  # auditors      = ["auditoria@exemplo.com"]
+  # finops        = ["finops@exemplo.com"]
+}

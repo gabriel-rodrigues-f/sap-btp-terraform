@@ -28,8 +28,8 @@
   check_mode: false
   no_log: true
 
-- name: Target the org and space created by Terraform
+- name: Target the org (and space, when given) created by Terraform
   ansible.builtin.command:
-    argv: [cf, target, -o, "{{ cf_target_org }}", -s, "{{ cf_target_space }}"]
+    argv: "{{ ['cf', 'target', '-o', cf_target_org] + (['-s', cf_target_space] if cf_target_space | length > 0 else []) }}"
   changed_when: false
   check_mode: false

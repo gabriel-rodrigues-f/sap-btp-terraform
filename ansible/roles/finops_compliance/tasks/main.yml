@@ -1,0 +1,79 @@
+---
+# Auditoria de governança: confere, no Cloud Foundry REAL (não no estado do
+# Terraform), se cada recurso da org carrega as labels de FinOps obrigatórias.
+# Pega também o que foi criado à mão no cockpit, fora do Terraform.
+
+- name: Read the org
+  ansible.builtin.command:
+    argv: [cf, curl, "/v3/organizations/{{ finops_compliance_org_id }}"]
+  register: finops_compliance_org
+  changed_when: false
+  check_mode: false
+
+- name: Read the spaces of the org
+  ansible.builtin.command:
+    argv: [cf, curl, "/v3/spaces?organization_guids={{ finops_compliance_org_id }}&per_page=5000"]
+  register: finops_compliance_spaces
+  changed_when: false
+  check_mode: false
+
+- name: Read the service instances of the org
+  ansible.builtin.command:
+    argv: [cf, curl, "/v3/service_instances?organization_guids={{ finops_compliance_org_id }}&per_page=5000"]
+  register: finops_compliance_instances
+  changed_when: false
+  check_mode: false
+
+- name: Read the service keys of those instances
+  vars:
+    finops_compliance_instance_guids: "{{ (finops_compliance_instances.stdout | from_json).resources | map(attribute='guid') | join(',') }}"
+  ansible.builtin.command:
+    argv: [cf, curl, "/v3/service_credential_bindings?type=key&service_instance_guids={{ finops_compliance_instance_guids }}&per_page=5000"]
+  register: finops_compliance_keys
+  when: finops_compliance_instance_guids | length > 0
+  changed_when: false
+  check_mode: false
+
+- name: Audit the required labels of every resource
+  ansible.builtin.set_fact:
+    finops_compliance_rows: >-
+      {{ {
+           'cf-org': [finops_compliance_org.stdout | from_json],
+           'cf-space': (finops_compliance_spaces.stdout | from_json).resources,
+           'service-instance': (finops_compliance_instances.stdout | from_json).resources,
+           'service-key': (finops_compliance_keys.stdout | default('{"resources": []}') | from_json).resources
+         } | finops_audit(finops_compliance_required_keys) }}
+
+- name: Ensure the report directory exists
+  ansible.builtin.file:
+    path: "{{ finops_compliance_report_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Write the cost allocation inventory (CSV)
+  ansible.builtin.template:
+    src: inventory.csv.j2
+    dest: "{{ finops_compliance_report_dir }}/cf-inventory.csv"
+    mode: "0644"
+
+- name: Show the compliance summary
+  vars:
+    finops_compliance_bad: "{{ finops_compliance_rows | rejectattr('compliant') | list }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ finops_compliance_rows | length }} recursos auditados,
+      {{ finops_compliance_bad | length }} sem labels obrigatórias.
+      Relatório: {{ finops_compliance_report_dir }}/cf-inventory.csv
+
+- name: Fail when a resource is missing required labels
+  vars:
+    finops_compliance_bad: "{{ finops_compliance_rows | rejectattr('compliant') | list }}"
+  ansible.builtin.assert:
+    that:
+      - finops_compliance_bad | length == 0
+    fail_msg: >-
+      Recursos sem labels de FinOps:
+      {% for r in finops_compliance_bad %}{{ r.type }} {{ r.name }} (falta: {{ r.missing | join(', ') }}); {% endfor %}
+    success_msg: Todos os recursos da org carregam as labels obrigatórias.
+    quiet: true
+  when: finops_compliance_enforce | bool

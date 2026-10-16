@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: finops_compliance
+  author: gabriel-rodrigues-f
+  description: Audita, no Cloud Foundry real, as labels de FinOps e gera inventário de custo.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: GenericUNIX
+      versions: [all]
+dependencies: []

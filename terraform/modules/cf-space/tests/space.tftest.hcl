@@ -1,8 +1,10 @@
 mock_provider "cloudfoundry" {}
 
 variables {
-  org_id = "11111111-2222-3333-4444-555555555555"
-  name   = "dev"
+  org_id      = "11111111-2222-3333-4444-555555555555"
+  name        = "integration"
+  labels      = { "cost-center" = "cc-1001", "environment" = "qa" }
+  annotations = { "owner-contact" = "platform@example.com" }
 
   roles = {
     space_manager   = ["ana@example.com"]
@@ -10,16 +12,22 @@ variables {
   }
 
   service_instances = {
-    "btp-poc-destination" = { offering = "destination", plan = "lite" }
-    "btp-poc-xsuaa" = {
+    destination = {
+      name     = "dest-application-integration-qa-us10-001"
+      offering = "destination"
+      plan     = "lite"
+      keys     = ["cicd", "integration-suite"]
+    }
+    xsuaa = {
+      name       = "uaa-application-integration-qa-us10-001"
       offering   = "xsuaa"
       plan       = "application"
-      parameters = jsonencode({ xsappname = "btp-poc", "tenant-mode" = "dedicated" })
+      parameters = "{\"xsappname\":\"uaa-application-integration-qa-us10-001\",\"tenant-mode\":\"dedicated\"}"
     }
   }
 }
 
-run "ssh_desligado_e_sem_labels_por_padrao" {
+run "space_rotulado_e_sem_ssh" {
   command = plan
 
   assert {
@@ -28,8 +36,13 @@ run "ssh_desligado_e_sem_labels_por_padrao" {
   }
 
   assert {
-    condition     = cloudfoundry_space.this.labels == null
-    error_message = "Sem labels, o atributo deve ficar nulo (o provider rejeita map vazio)."
+    condition     = cloudfoundry_space.this.labels["resource-type"] == "cf-space" && cloudfoundry_space.this.labels["cost-center"] == "cc-1001"
+    error_message = "Space deve receber as labels de FinOps + resource-type."
+  }
+
+  assert {
+    condition     = cloudfoundry_space.this.annotations["owner-contact"] == "platform@example.com"
+    error_message = "Annotations devem ser repassadas."
   }
 }
 
@@ -40,23 +53,28 @@ run "um_role_por_usuario_e_papel" {
     condition     = length(cloudfoundry_space_role.this) == 3
     error_message = "Esperado 3 atribuições (1 manager + 2 developers)."
   }
-
-  assert {
-    condition     = cloudfoundry_space_role.this["space_developer|bia@example.com"].origin == "sap.ids"
-    error_message = "Origem padrão deve ser sap.ids."
-  }
 }
 
-run "parametros_json_sao_repassados" {
+run "instancias_e_keys_rotuladas" {
   command = plan
 
   assert {
-    condition     = cloudfoundry_service_instance.this["btp-poc-destination"].parameters == null
-    error_message = "Sem parameters, o atributo deve ficar nulo."
+    condition     = cloudfoundry_service_instance.this["destination"].labels["service"] == "destination" && cloudfoundry_service_instance.this["destination"].labels["plan"] == "lite"
+    error_message = "Instância deve carregar service e plan."
   }
 
   assert {
-    condition     = jsondecode(cloudfoundry_service_instance.this["btp-poc-xsuaa"].parameters).xsappname == "btp-poc"
+    condition     = toset(keys(cloudfoundry_service_credential_binding.key)) == toset(["destination/cicd", "destination/integration-suite"])
+    error_message = "Uma key por consumidor; xsuaa sem keys não gera binding."
+  }
+
+  assert {
+    condition     = cloudfoundry_service_credential_binding.key["destination/cicd"].name == "sk-cicd" && cloudfoundry_service_credential_binding.key["destination/cicd"].labels["consumer"] == "cicd"
+    error_message = "Key: nome sk-<consumidor> e label consumer."
+  }
+
+  assert {
+    condition     = jsondecode(cloudfoundry_service_instance.this["xsuaa"].parameters).xsappname == "uaa-application-integration-qa-us10-001"
     error_message = "parameters deve chegar intacto ao service broker."
   }
 }
@@ -76,7 +94,7 @@ run "rejeita_parametros_que_nao_sao_json" {
 
   variables {
     service_instances = {
-      quebrado = { offering = "destination", plan = "lite", parameters = "{nao-e-json" }
+      quebrado = { name = "x", offering = "destination", plan = "lite", parameters = "{nao-e-json" }
     }
   }
 

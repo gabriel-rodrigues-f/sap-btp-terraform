@@ -1,28 +1,15 @@
 ---
-# Configuração "Day 1/Day 2" sobre a infraestrutura que o Terraform criou:
-#   preflight -> contexto (outputs do Terraform) -> target -> deploy -> smoke test
+# Configuração e governança sobre o que o Terraform criou:
+#   preflight -> contexto (outputs do Terraform) -> login no CF
+#   -> labels na org (lacuna do Terraform) -> auditoria de FinOps
 #
 # Uso (de dentro de ansible/):
 #   ansible-playbook playbooks/site.yml            # aplica
 #   ansible-playbook playbooks/site.yml --check    # mostra o que mudaria
-#   ansible-playbook playbooks/site.yml -e cf_app_force_push=true
 
-- name: Deploy and verify the sample app on SAP BTP Cloud Foundry
+- name: Complete and audit the SAP BTP Cloud Foundry org
   hosts: btp_control
   gather_facts: false
-
-  vars:
-    # Host único na região: inclui o nome da org (que já é único por global account).
-    app_route: "{{ app_name }}-{{ btp_context_info.cf_org_name }}.{{ btp_context_info.cf_apps_domain }}"
-
-  pre_tasks:
-    - name: Validate the environment parameters
-      ansible.builtin.assert:
-        that:
-          - app_name is match('^[a-z][a-z0-9-]{1,30}$')
-          - app_instances | int >= 1
-        fail_msg: "Parâmetros inválidos em inventory/group_vars/btp_control.yml"
-        quiet: true
 
   roles:
     - role: preflight
@@ -33,20 +20,14 @@
       vars:
         cf_target_api_url: "{{ btp_context_info.cf_api_url }}"
         cf_target_org: "{{ btp_context_info.cf_org_name }}"
-        cf_target_space: "{{ btp_context_info.cf_space_name }}"
 
-    - role: cf_app
+    - role: cf_org_metadata
       vars:
-        cf_app_name: "{{ app_name }}"
-        cf_app_memory: "{{ app_memory }}"
-        cf_app_instances: "{{ app_instances }}"
-        cf_app_space_id: "{{ btp_context_info.cf_space_id }}"
-        cf_app_route: "{{ app_route }}"
-        cf_app_services: "{{ btp_context_info.service_instances | list }}"
-        cf_app_env:
-          DESTINATION_NAME: "{{ app_destination_name }}"
+        cf_org_metadata_org_id: "{{ btp_context_info.cf_org_id }}"
+        cf_org_metadata_labels: "{{ btp_context_info.cf_org_metadata.labels }}"
+        cf_org_metadata_annotations: "{{ btp_context_info.cf_org_metadata.annotations }}"
 
-    - role: smoke_test
+    - role: finops_compliance
       vars:
-        smoke_test_base_url: "https://{{ app_route }}"
-        smoke_test_destination_name: "{{ app_destination_name }}"
+        finops_compliance_org_id: "{{ btp_context_info.cf_org_id }}"
+        finops_compliance_required_keys: "{{ btp_context_info.required_label_keys }}"

@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Nome de exibição do subaccount no cockpit."
+  description = "Nome de exibição do subaccount (ex.: application-integration-qa-us10)."
   type        = string
 }
 
@@ -42,7 +42,7 @@ variable "usage" {
 }
 
 variable "labels" {
-  description = "Labels do subaccount (map de set de strings, formato exigido pela API do BTP)."
+  description = "Labels de FinOps do subaccount (map de set, formato da API do BTP)."
   type        = map(set(string))
   default     = {}
 }
@@ -68,25 +68,6 @@ variable "entitlements" {
   }
 }
 
-variable "subscriptions" {
-  description = <<-EOT
-    Assinaturas de aplicações SaaS (ex.: SAP Business Application Studio).
-    Exigem o entitlement correspondente. 'parameters' é uma string JSON
-    (jsonencode()/file() em HCL; heredoc em .tfvars).
-  EOT
-  type = list(object({
-    app_name   = string
-    plan_name  = string
-    parameters = optional(string)
-  }))
-  default = []
-
-  validation {
-    condition     = alltrue([for s in var.subscriptions : s.parameters == null || can(jsondecode(s.parameters))])
-    error_message = "subscriptions[*].parameters deve ser um JSON válido."
-  }
-}
-
 variable "role_collection_assignments" {
   description = <<-EOT
     Mapa "role collection" => lista de usuários (e-mail no SAP ID service).
@@ -94,20 +75,4 @@ variable "role_collection_assignments" {
   EOT
   type        = map(list(string))
   default     = {}
-}
-
-variable "destinations" {
-  description = <<-EOT
-    Destinations HTTP no nível do subaccount. A chave do mapa é o nome da destination.
-    Use apenas destinations SEM segredo aqui; credenciais devem vir de um cofre
-    (ex.: variável sensível alimentada pelo pipeline), nunca do código.
-  EOT
-  type = map(object({
-    url            = string
-    description    = optional(string)
-    proxy_type     = optional(string, "Internet")
-    authentication = optional(string, "NoAuthentication")
-    properties     = optional(map(string), {})
-  }))
-  default = {}
 }
