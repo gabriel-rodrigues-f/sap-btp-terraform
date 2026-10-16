@@ -4,9 +4,14 @@ variable "subaccount_id" {
 }
 
 variable "labels" {
-  description = "Labels de FinOps (map de set) aplicadas a instâncias e service keys."
+  description = "Labels de FinOps (map de set). Máximo 9 chaves: a service key soma 'consumer' e o BTP aceita 10."
   type        = map(set(string))
   default     = {}
+
+  validation {
+    condition     = length(var.labels) <= 9
+    error_message = "Use no máximo 9 chaves: a service key adiciona 'consumer' e o BTP aceita 10."
+  }
 }
 
 variable "subscriptions" {

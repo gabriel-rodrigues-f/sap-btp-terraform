@@ -134,7 +134,7 @@ make check                       # lint + validate + test (o mesmo que o CI)
 
 | Ferramenta | O que garante |
 | --- | --- |
-| `terraform test` + `mock_provider` | 31 testes da lógica dos módulos (nomes, labels, RBAC, chaves de `for_each`) sem tocar no BTP |
+| `terraform test` + `mock_provider` | 35 testes da lógica dos módulos (nomes, labels, RBAC, chaves de `for_each`) sem tocar no BTP |
 | `tflint` (preset `all`) | Variáveis tipadas e documentadas, versões declaradas, nada sem uso |
 | `ansible-lint` (perfil `production`) | FQCN, `changed_when`, prefixo de variáveis por role, permissões |
 | `trivy config` | Misconfiguração e segredos versionados |

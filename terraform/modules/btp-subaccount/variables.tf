@@ -42,9 +42,14 @@ variable "usage" {
 }
 
 variable "labels" {
-  description = "Labels de FinOps do subaccount (map de set, formato da API do BTP)."
+  description = "Labels de FinOps do subaccount (map de set). A API do BTP aceita no máximo 10 chaves."
   type        = map(set(string))
   default     = {}
+
+  validation {
+    condition     = length(var.labels) <= 10
+    error_message = "O BTP aceita no máximo 10 chaves de label por recurso."
+  }
 }
 
 variable "entitlements" {

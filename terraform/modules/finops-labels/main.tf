@@ -37,10 +37,21 @@ locals {
     "iac-repository"      = var.iac_repository
   })
 
-  # O directory é da unidade de negócio inteira: não tem workload, ambiente nem região.
-  directory_labels = {
-    for k, v in local.environment_labels : k => v
-    if !contains(["workload", "environment", "region", "criticality", "data-classification"], k)
+  # A API do BTP aceita no MÁXIMO 10 chaves de label por recurso. Ficam fora
+  # do lado BTP as que já são atributos nativos do objeto (região do
+  # subaccount) ou só servem ao Cloud Foundry; labels extras vão só para o CF.
+  # Assim sobra espaço para 1 chave específica do recurso (ex.: consumer).
+  btp_excluded = ["region", "iac-repository"]
+
+  btp_labels = merge(
+    { for k, v in local.environment_labels : k => toset([v]) if !contains(local.btp_excluded, k) && !contains(keys(var.extra), k) },
+    { "owner-contact" = toset([var.owner_contact]) },
+  )
+
+  # O directory é da unidade de negócio inteira: não tem workload, ambiente nem criticidade.
+  btp_directory_labels = {
+    for k, v in local.btp_labels : k => v
+    if !contains(["workload", "environment", "criticality", "data-classification"], k)
   }
 }
 

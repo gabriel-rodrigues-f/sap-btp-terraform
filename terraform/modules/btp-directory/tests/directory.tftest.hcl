@@ -25,8 +25,8 @@ run "directory_com_cota_e_permissoes" {
   }
 
   assert {
-    condition     = btp_directory.this.labels["resource-type"] == toset(["directory"]) && btp_directory.this.labels["cost-center"] == toset(["cc-1001"])
-    error_message = "Labels de FinOps + resource-type devem ser aplicadas."
+    condition     = length(btp_directory.this.labels) == 1 && btp_directory.this.labels["cost-center"] == toset(["cc-1001"])
+    error_message = "Labels de FinOps devem ser aplicadas como recebidas."
   }
 
   assert {
@@ -48,4 +48,14 @@ run "rejeita_role_collection_inexistente_no_directory" {
   }
 
   expect_failures = [var.role_collection_assignments]
+}
+
+run "rejeita_mais_de_10_labels" {
+  command = plan
+
+  variables {
+    labels = { k0 = ["v"], k1 = ["v"], k2 = ["v"], k3 = ["v"], k4 = ["v"], k5 = ["v"], k6 = ["v"], k7 = ["v"], k8 = ["v"], k9 = ["v"], k10 = ["v"] }
+  }
+
+  expect_failures = [var.labels]
 }

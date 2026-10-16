@@ -30,7 +30,7 @@ resource "btp_subaccount" "this" {
   description = var.description
   parent_id   = var.parent_id
   usage       = var.usage
-  labels      = merge(var.labels, { "resource-type" = toset(["subaccount"]) })
+  labels      = var.labels
 
   # Em produção, considere `lifecycle { prevent_destroy = true }`: o subaccount
   # guarda apps, serviços e dados, e um destroy acidental é irrecuperável.

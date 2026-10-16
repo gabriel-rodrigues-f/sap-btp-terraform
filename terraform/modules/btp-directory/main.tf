@@ -23,7 +23,7 @@ resource "btp_directory" "this" {
   name        = var.name
   description = var.description
   subdomain   = var.subdomain
-  labels      = merge(var.labels, { "resource-type" = toset(["directory"]) })
+  labels      = var.labels
 
   # DEFAULT: agrupar e ver custo | ENTITLEMENTS: distribuir cota |
   # AUTHORIZATIONS: ter administradores/viewers próprios (exige ENTITLEMENTS).

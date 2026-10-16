@@ -4,19 +4,18 @@ output "required_keys" {
 }
 
 output "btp" {
-  description = "Labels no formato do BTP (map de set) para subaccount, instâncias e bindings."
-  value = merge(
-    { for k, v in local.environment_labels : k => toset([v]) },
-    { "owner-contact" = toset([var.owner_contact]) },
-  )
+  description = "Labels no formato do BTP (map de set) para subaccount, instâncias e bindings. No máximo 9 chaves."
+  value       = local.btp_labels
+
+  precondition {
+    condition     = length(local.btp_labels) <= 9
+    error_message = "O BTP aceita até 10 chaves de label por recurso; o conjunto base deve deixar 1 livre para a chave do recurso."
+  }
 }
 
 output "btp_directory" {
   description = "Labels do directory (nível unidade de negócio, sem workload/ambiente)."
-  value = merge(
-    { for k, v in local.directory_labels : k => toset([v]) },
-    { "owner-contact" = toset([var.owner_contact]) },
-  )
+  value       = local.btp_directory_labels
 }
 
 output "cf" {

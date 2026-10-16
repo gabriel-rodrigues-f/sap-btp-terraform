@@ -49,11 +49,9 @@ resource "btp_subaccount_service_instance" "this" {
   serviceplan_name      = each.value.plan
   parameters            = each.value.parameters
 
-  labels = merge(var.labels, {
-    "resource-type" = toset(["service-instance"])
-    "service"       = toset([each.value.offering])
-    "plan"          = toset([each.value.plan])
-  })
+  # Serviço e plano já são atributos da instância (e aparecem nos relatórios
+  # de uso do BTP); não gastamos chaves de label com eles (limite de 10).
+  labels = var.labels
 
   timeouts = {
     create = "20m"
@@ -69,8 +67,6 @@ resource "btp_subaccount_service_binding" "this" {
   name                = "sk-${each.value.consumer}"
 
   labels = merge(var.labels, {
-    "resource-type" = toset(["service-key"])
-    "service"       = toset([each.value.offering])
-    "consumer"      = toset([each.value.consumer])
+    "consumer" = toset([each.value.consumer])
   })
 }

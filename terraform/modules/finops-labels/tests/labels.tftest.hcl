@@ -46,6 +46,29 @@ run "email_nunca_vira_label_no_cf" {
   }
 }
 
+run "btp_cabe_no_limite_de_10_chaves" {
+  command = plan
+
+  variables {
+    extra = { project = "s4-migration", squad = "integration" }
+  }
+
+  assert {
+    condition     = length(output.btp) <= 9
+    error_message = "O conjunto BTP deve ter no máximo 9 chaves (sobra 1 para a chave do recurso)."
+  }
+
+  assert {
+    condition     = !contains(keys(output.btp), "region") && !contains(keys(output.btp), "iac-repository")
+    error_message = "region e iac-repository ficam fora do BTP (atributo nativo / só CF)."
+  }
+
+  assert {
+    condition     = !contains(keys(output.btp), "project") && output.cf["project"] == "s4-migration"
+    error_message = "Labels extras vão só para o Cloud Foundry."
+  }
+}
+
 run "directory_nao_carrega_ambiente" {
   command = plan
 

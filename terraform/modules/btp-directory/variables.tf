@@ -15,9 +15,14 @@ variable "description" {
 }
 
 variable "labels" {
-  description = "Labels de FinOps do directory (map de set)."
+  description = "Labels de FinOps do directory (map de set). A API do BTP aceita no máximo 10 chaves."
   type        = map(set(string))
   default     = {}
+
+  validation {
+    condition     = length(var.labels) <= 10
+    error_message = "O BTP aceita no máximo 10 chaves de label por recurso."
+  }
 }
 
 variable "entitlements" {

@@ -54,27 +54,44 @@ Taxonomia única (baseada nas recomendações de *cost allocation* da FinOps Fou
 | `business-unit` | `corporate-it` | Showback por área | ✅ |
 | `workload` | `application-integration` | Custo por produto/aplicação | ✅ |
 | `environment` | `qa` | Separar produtivo de não produtivo | ✅ |
-| `region` | `us10` | Custo e residência de dados por região | ✅ |
+| `region` | `us10` | Custo e residência de dados por região (no BTP é atributo nativo do subaccount) | ✅ (CF) |
 | `owner` | `platform-team` | Time responsável | ✅ |
 | `criticality` | `medium` | Prioridade de otimização e suporte | ✅ |
 | `data-classification` | `internal` | Governança e compliance | ✅ |
 | `managed-by` | `terraform` | Detectar recurso criado à mão | ✅ |
-| `iac-repository` | `sap-btp-terraform` | Onde está o código que criou o recurso | |
+| `iac-repository` | `sap-btp-terraform` | Onde está o código que criou o recurso (só CF) | |
 | `owner-contact` | `voce@exemplo.com` | Quem acionar (label no BTP, **annotation** no CF) | |
-| `resource-type` | `subaccount`, `service-key`... | Filtrar o inventário por tipo | (automática) |
-| `service` / `plan` | `destination` / `lite` | Custo por serviço e plano | (automática) |
-| `consumer` | `cicd` | Quem usa cada service key | (automática) |
+| `resource-type` | `cf-space`, `service-key`... | Filtrar o inventário por tipo (só CF) | (automática) |
+| `service` / `plan` | `destination` / `lite` | Custo por serviço e plano (só CF; no BTP são atributos nativos) | (automática) |
+| `consumer` | `cicd` | Quem usa cada service key (BTP e CF) | (automática) |
 
 ### Onde cada label é aplicada
 
 | Recurso | Formato | Quem aplica |
 | --- | --- | --- |
-| Directory | `map(set(string))`, sem workload/ambiente (é da unidade inteira) | Terraform |
-| Subaccount | `map(set(string))` | Terraform |
-| Instância e service key no nível do subaccount | `map(set(string))` + `service`, `plan`, `consumer` | Terraform |
+| Directory | `map(set(string))`, 5 chaves (sem workload/ambiente: é da unidade inteira) | Terraform |
+| Subaccount | `map(set(string))`, 9 chaves | Terraform |
+| Instância no nível do subaccount | `map(set(string))`, 9 chaves | Terraform |
+| Service key no nível do subaccount | `map(set(string))`, 9 chaves + `consumer` | Terraform |
 | Space, instância e service key no Cloud Foundry | `map(string)` + annotations | Terraform |
 | **Org Cloud Foundry** | `map(string)` + annotations | **Ansible** (a org é criada pelo BTP; o provider CF não é dono dela) |
 | Assinatura SaaS | — | A API do BTP **não aceita** labels em assinaturas; o custo é atribuído pelas labels do subaccount |
+
+### Limite do BTP: no máximo 10 chaves por recurso
+
+A API do BTP recusa mais de 10 chaves de label num mesmo recurso. O limite não
+aparece na documentação do provider; foi descoberto no primeiro `plan` desta
+POC. Por isso o lado BTP leva só o essencial:
+
+- ficam fora as labels que já são **atributos nativos** do objeto (`region` no
+  subaccount, serviço e plano na instância) ou que só servem ao CF
+  (`iac-repository`, `resource-type`);
+- labels extras da empresa (`finops.extra`) vão só para o Cloud Foundry;
+- o conjunto base tem 9 chaves, o que deixa 1 livre para a chave do recurso
+  (`consumer` nas service keys).
+
+Os módulos validam o limite (`length(var.labels) <= 10`), então o erro aparece
+no `plan`, com mensagem clara, e há teste para isso.
 
 ### Regras do Cloud Foundry que o módulo já valida
 

@@ -26,8 +26,8 @@ run "subaccount_rotulado_e_nao_produtivo" {
   command = plan
 
   assert {
-    condition     = btp_subaccount.this.labels["resource-type"] == toset(["subaccount"]) && btp_subaccount.this.labels["cost-center"] == toset(["cc-1001"])
-    error_message = "Labels de FinOps + resource-type devem ser aplicadas."
+    condition     = btp_subaccount.this.labels["cost-center"] == toset(["cc-1001"]) && length(btp_subaccount.this.labels) == 2
+    error_message = "Labels de FinOps devem ser aplicadas como recebidas."
   }
 
   assert {
@@ -89,4 +89,14 @@ run "rejeita_entitlement_duplicado" {
   }
 
   expect_failures = [var.entitlements]
+}
+
+run "rejeita_mais_de_10_labels" {
+  command = plan
+
+  variables {
+    labels = { k0 = ["v"], k1 = ["v"], k2 = ["v"], k3 = ["v"], k4 = ["v"], k5 = ["v"], k6 = ["v"], k7 = ["v"], k8 = ["v"], k9 = ["v"], k10 = ["v"] }
+  }
+
+  expect_failures = [var.labels]
 }

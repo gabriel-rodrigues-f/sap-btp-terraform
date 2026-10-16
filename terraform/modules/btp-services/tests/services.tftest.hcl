@@ -23,17 +23,12 @@ variables {
   }
 }
 
-run "instancias_com_labels_de_servico_e_plano" {
+run "instancias_com_labels_de_finops" {
   command = plan
 
   assert {
-    condition     = btp_subaccount_service_instance.this["audit"].labels["service"] == toset(["auditlog-management"])
-    error_message = "Instância deve carregar a label service (custo por serviço)."
-  }
-
-  assert {
-    condition     = btp_subaccount_service_instance.this["audit"].labels["plan"] == toset(["default"]) && btp_subaccount_service_instance.this["audit"].labels["cost-center"] == toset(["cc-1001"])
-    error_message = "Instância deve somar plan às labels de FinOps."
+    condition     = length(btp_subaccount_service_instance.this["audit"].labels) == 1 && btp_subaccount_service_instance.this["audit"].labels["cost-center"] == toset(["cc-1001"])
+    error_message = "Instância recebe as labels de FinOps (serviço e plano já são atributos nativos)."
   }
 }
 
@@ -75,4 +70,14 @@ run "rejeita_consumidor_fora_do_padrao" {
   }
 
   expect_failures = [var.service_instances]
+}
+
+run "rejeita_mais_de_9_labels" {
+  command = plan
+
+  variables {
+    labels = { k0 = ["v"], k1 = ["v"], k2 = ["v"], k3 = ["v"], k4 = ["v"], k5 = ["v"], k6 = ["v"], k7 = ["v"], k8 = ["v"], k9 = ["v"] }
+  }
+
+  expect_failures = [var.labels]
 }
