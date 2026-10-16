@@ -14,6 +14,7 @@
 | `cloudfoundry_org_role`: role already exists / 422 | Papel criado fora do Terraform (cockpit) | Remova o papel manual ou importe-o; o deployer já é excluído automaticamente |
 | `cloudfoundry_org_role`/`space_role`: usuário não encontrado | Usuário nunca logou no Cloud Foundry desta região (não existe no UAA) | Peça para a pessoa fazer `cf login` uma vez, ou use `user_origin` correto se for IdP customizado |
 | Criação de instância CF retorna 403 | Usuário do Terraform sem `space_developer` | O stack 20 já dá esse papel ao deployer; confira `terraform output access` no stack 10 |
+| `Provider produced inconsistent result after apply` em `btp_subaccount_service_instance` (`.labels[...]`) | Bug do provider 1.27.0: a última chave de label volta com uma aspa extra | Mantenha `label_service_manager_resources = false` (padrão); o próximo apply recria as instâncias marcadas como *tainted* |
 | Ansible: `Recursos sem labels de FinOps` | Recurso criado à mão no cockpit, sem labels | Crie pelo Terraform ou rotule com `cf set-label`; o CSV em `.build/finops/` mostra o que falta |
 | Todo `plan` mostra mudança | Valor volátil (`timestamp()`) ou atributo alterado fora do Terraform | `make drift` mostra o que mudou; remova valores voláteis |
 | Trial "suspended" | 30 dias sem extensão | Estenda no cockpit da trial |

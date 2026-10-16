@@ -71,8 +71,8 @@ Taxonomia única (baseada nas recomendações de *cost allocation* da FinOps Fou
 | --- | --- | --- |
 | Directory | `map(set(string))`, 5 chaves (sem workload/ambiente: é da unidade inteira) | Terraform |
 | Subaccount | `map(set(string))`, 9 chaves | Terraform |
-| Instância no nível do subaccount | `map(set(string))`, 9 chaves | Terraform |
-| Service key no nível do subaccount | `map(set(string))`, 9 chaves + `consumer` | Terraform |
+| Instância no nível do subaccount | — por padrão (bug do provider, veja abaixo); o custo é atribuído pelas labels do subaccount | Terraform |
+| Service key no nível do subaccount | — por padrão (mesmo bug) | Terraform |
 | Space, instância e service key no Cloud Foundry | `map(string)` + annotations | Terraform |
 | **Org Cloud Foundry** | `map(string)` + annotations | **Ansible** (a org é criada pelo BTP; o provider CF não é dono dela) |
 | Assinatura SaaS | — | A API do BTP **não aceita** labels em assinaturas; o custo é atribuído pelas labels do subaccount |
@@ -92,6 +92,20 @@ POC. Por isso o lado BTP leva só o essencial:
 
 Os módulos validam o limite (`length(var.labels) <= 10`), então o erro aparece
 no `plan`, com mensagem clara, e há teste para isso.
+
+### Bug do provider nas instâncias do Service Manager
+
+No primeiro `apply` real (provider `SAP/btp` 1.27.0), as instâncias criadas
+via Service Manager voltaram com a **última** chave de label corrompida:
+`workload = application-integration"` (aspa extra no fim). O apply falha com
+*Provider produced inconsistent result after apply*. Directory e subaccount usam
+outro caminho na API e ficaram corretos (conferido via `btp get accounts/subaccount`).
+
+Por isso o módulo `btp-services` tem `label_service_manager_resources = false`
+por padrão: instâncias e service keys do Service Manager saem sem labels, e o
+custo delas é atribuído pelas labels do subaccount, como nas assinaturas.
+Quando o provider corrigir, basta ligar a opção. Esse é um bom exemplo de por que
+vale rodar o `apply` real cedo: nenhum teste com mock pegaria esse bug.
 
 ### Regras do Cloud Foundry que o módulo já valida
 

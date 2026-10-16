@@ -23,8 +23,16 @@ variables {
   }
 }
 
-run "instancias_com_labels_de_finops" {
+# Com label_service_manager_resources = false (padrão), o atributo `labels`
+# fica nulo na config e o provider o calcula: no plan ele é "desconhecido",
+# então só dá para testar o caso ligado. O desligado é validado no apply real.
+
+run "instancias_com_labels_de_finops_quando_ligado" {
   command = plan
+
+  variables {
+    label_service_manager_resources = true
+  }
 
   assert {
     condition     = length(btp_subaccount_service_instance.this["audit"].labels) == 1 && btp_subaccount_service_instance.this["audit"].labels["cost-center"] == toset(["cc-1001"])
@@ -46,8 +54,8 @@ run "uma_service_key_por_consumidor" {
   }
 
   assert {
-    condition     = btp_subaccount_service_binding.this["audit/cicd"].labels["consumer"] == toset(["cicd"])
-    error_message = "A key deve identificar o consumidor por label."
+    condition     = btp_subaccount_service_binding.this["audit/siem"].name == "sk-siem"
+    error_message = "Nome da key é sempre sk-<consumidor>, com ou sem labels."
   }
 }
 

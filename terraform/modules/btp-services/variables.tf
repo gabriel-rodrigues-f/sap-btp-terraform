@@ -60,3 +60,16 @@ variable "service_instances" {
     error_message = "Consumidores de service key: kebab-case curto (ex.: cicd, integration-suite)."
   }
 }
+
+variable "label_service_manager_resources" {
+  description = <<-EOT
+    Aplica as labels também nas instâncias e service keys do Service Manager.
+    Desligado por padrão: no provider SAP/btp 1.27.0, a criação dessas
+    instâncias grava a ÚLTIMA chave de label com uma aspa extra
+    (ex.: workload = application-integration") e o apply falha com
+    "Provider produced inconsistent result after apply". Directory e
+    subaccount não são afetados. Religue quando o provider corrigir.
+  EOT
+  type        = bool
+  default     = false
+}
